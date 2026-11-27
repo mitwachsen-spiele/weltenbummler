@@ -4,6 +4,7 @@
 // Konzept: docs/games/mitwachsen.md · Spec: docs/specs/mitwachsen.md
 
 import type { Part } from '../../lib/games/front';
+import { CARRY_DRESS, dress } from './mitwachsen-fine';
 import type { SpeciesOf } from './mitwachsen-species';
 
 /**
@@ -17,16 +18,19 @@ export const FISH_COLORS = {
 } as const;
 
 /** Netz mit zwei silberblauen Fischen in der linken Hand (nach dem Fangen, bis zur Eisschale); gespiegelt zum Eimer */
-export const FISH_PARTS: Part[] = [
-  [-0.11, -0.47, 0.06, 0.22, 0.2, 0.19, '#d8cfb4', FISH_COLORS.fish[0]], // Netz, oben schauen die Fische heraus
-  [-0.115, -0.475, 0.13, 0.23, 0.21, 0.02, '#b9ae90'], // Maschen
-  [-0.115, -0.475, 0.25, 0.23, 0.21, 0.03, '#8a5f2a'], // Rand
-  [-0.01, -0.38, 0.28, 0.02, 0.02, 0.08, '#5d4a2f'], // Stiel bis zur Hand
-  [-0.07, -0.44, 0.22, 0.06, 0.05, 0.1, ...FISH_COLORS.fish], // zwei Fische, die Schwänze stehen über den Rand
-  [-0.09, -0.46, 0.31, 0.1, 0.09, 0.06, FISH_COLORS.fin],
-  [0.02, -0.37, 0.22, 0.06, 0.05, 0.08, ...FISH_COLORS.fish],
-  [0.0, -0.39, 0.29, 0.1, 0.09, 0.06, FISH_COLORS.fin],
-];
+export const FISH_PARTS: Part[] = dress(
+  [
+    [-0.11, -0.47, 0.06, 0.22, 0.2, 0.19, '#d8cfb4', FISH_COLORS.fish[0]], // Netz, oben schauen die Fische heraus
+    [-0.115, -0.475, 0.13, 0.23, 0.21, 0.02, '#b9ae90'], // Maschen
+    [-0.115, -0.475, 0.25, 0.23, 0.21, 0.03, '#8a5f2a'], // Rand
+    [-0.01, -0.38, 0.28, 0.02, 0.02, 0.08, '#5d4a2f'], // Stiel bis zur Hand
+    [-0.07, -0.44, 0.22, 0.06, 0.05, 0.1, ...FISH_COLORS.fish], // zwei Fische, die Schwänze stehen über den Rand
+    [-0.09, -0.46, 0.31, 0.1, 0.09, 0.06, FISH_COLORS.fin],
+    [0.02, -0.37, 0.22, 0.06, 0.05, 0.08, ...FISH_COLORS.fish],
+    [0.0, -0.39, 0.29, 0.1, 0.09, 0.06, FISH_COLORS.fin],
+  ],
+  CARRY_DRESS,
+);
 
 /** Funken beim Fangen (Platsch) und beim Füttern mit Fisch (silbern und goldgelb) */
 export const FISH_SPARKS = {

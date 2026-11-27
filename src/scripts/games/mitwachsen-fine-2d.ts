@@ -88,6 +88,28 @@ function shade(ctx: CanvasRenderingContext2D, side: boolean, halo: boolean): Can
 /** Kennung eines Leuchtens aus seiner Lage (gleich in jedem Bild, solange es nicht wandert) */
 const haloId = (h: HaloAt) => `${h.x.toFixed(2)},${h.y.toFixed(2)},${h.z.toFixed(2)}`;
 
+/** Muster (wenn `skins`) und Verlauf über eine schon gefüllte Fläche */
+function overlay(ctx: CanvasRenderingContext2D, f: FaceRect, fine: Fine | undefined, skins: boolean) {
+  if (f.lu < 1e-4 || f.lv < 1e-4 || Math.abs(f.w) < 0.5 || Math.abs(f.h) < 0.5) return;
+  ctx.save();
+  ctx.transform(f.w / f.lu, 0, 0, f.h / f.lv, f.x, f.y); // Einheiten der Fläche (Felder)
+  const p = skins && fine?.skin ? pattern(ctx, fine.skin) : null;
+  if (p) {
+    ctx.fillStyle = p;
+    ctx.fillRect(0, 0, f.lu, f.lv);
+  }
+  ctx.scale(f.lu, f.lv);
+  ctx.fillStyle = shade(ctx, f.side, !!fine?.halo);
+  ctx.fillRect(0, 0, 1, 1);
+  ctx.restore();
+}
+
+/**
+ * Maler in Symbolgröße (Tiere der Leiste unten): nur Verlauf und Oberkante, kein Muster (es wäre dort nur Rauschen) und
+ * kein Leuchten
+ */
+export const ICON_PAINTER: FinePainter = { face: (ctx, f, fine) => overlay(ctx, f, fine, false) };
+
 /**
  * Maler der feinen Dinge in 2D: Muster und Verlauf je Fläche (die helle Oberkante zieht `box` selbst), Leuchten werden
  * gesammelt und nach der Welt in einem Durchgang gezeichnet (mitwachsen-halo.ts)
@@ -96,18 +118,7 @@ export class Fine2D implements FinePainter {
   halos: Halo[] = [];
 
   face(ctx: CanvasRenderingContext2D, f: FaceRect, fine: Fine | undefined) {
-    if (f.lu < 1e-4 || f.lv < 1e-4 || Math.abs(f.w) < 0.5 || Math.abs(f.h) < 0.5) return;
-    ctx.save();
-    ctx.transform(f.w / f.lu, 0, 0, f.h / f.lv, f.x, f.y); // Einheiten der Fläche (Felder)
-    const p = fine?.skin ? pattern(ctx, fine.skin) : null;
-    if (p) {
-      ctx.fillStyle = p;
-      ctx.fillRect(0, 0, f.lu, f.lv);
-    }
-    ctx.scale(f.lu, f.lv);
-    ctx.fillStyle = shade(ctx, f.side, !!fine?.halo);
-    ctx.fillRect(0, 0, 1, 1);
-    ctx.restore();
+    overlay(ctx, f, fine, true);
   }
 
   halo(at: HaloAt) {

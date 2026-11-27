@@ -6,6 +6,7 @@
 // Konzept: docs/games/mitwachsen.md (Höhlenwelt) · Spec: docs/specs/mitwachsen.md (Abschnitt „Die Höhlen-Tiere“)
 
 import type { Part } from '../../lib/games/front';
+import { CARRY_DRESS, dress } from './mitwachsen-fine';
 import type { SpeciesOf } from './mitwachsen-species';
 
 /**
@@ -17,19 +18,22 @@ export const SHROOM_COLORS = ['#ff9cd4', '#6fd6f0', '#ffe08a'] as const;
 const STEM = '#efe4d2'; // Stiel der Leuchtpilze
 
 /** Korb mit Leuchtpilzen auf dem Rücken (nach dem Sammeln am Beet, bis zur Pilzschale); der Korb wie bei den Beeren */
-export const SHROOM_BASKET_PARTS: Part[] = [
-  [-0.33, -0.17, 0.38, 0.21, 0.34, 0.3, '#b0803c', '#c9984e'], // Korb aus Weide
-  [-0.335, -0.175, 0.47, 0.22, 0.35, 0.03, '#8a5f2a'], // Flechtband
-  [-0.335, -0.175, 0.6, 0.22, 0.35, 0.03, '#8a5f2a'],
-  [-0.12, -0.15, 0.7, 0.25, 0.04, 0.03, '#8a5f2a'], // Riemen über den Schultern
-  [-0.12, 0.11, 0.7, 0.25, 0.04, 0.03, '#8a5f2a'],
-  [-0.27, -0.11, 0.68, 0.03, 0.03, 0.07, STEM], // drei Stiele, darauf die Hüte in den drei Farben
-  [-0.23, 0.0, 0.68, 0.03, 0.03, 0.09, STEM],
-  [-0.2, -0.07, 0.68, 0.03, 0.03, 0.05, STEM],
-  [-0.3, -0.14, 0.75, 0.09, 0.09, 0.04, SHROOM_COLORS[0], SHROOM_COLORS[0]],
-  [-0.26, -0.03, 0.77, 0.09, 0.09, 0.04, SHROOM_COLORS[1], SHROOM_COLORS[1]],
-  [-0.23, -0.1, 0.73, 0.09, 0.09, 0.04, SHROOM_COLORS[2], SHROOM_COLORS[2]],
-];
+export const SHROOM_BASKET_PARTS: Part[] = dress(
+  [
+    [-0.33, -0.17, 0.38, 0.21, 0.34, 0.3, '#b0803c', '#c9984e'], // Korb aus Weide
+    [-0.335, -0.175, 0.47, 0.22, 0.35, 0.03, '#8a5f2a'], // Flechtband
+    [-0.335, -0.175, 0.6, 0.22, 0.35, 0.03, '#8a5f2a'],
+    [-0.12, -0.15, 0.7, 0.25, 0.04, 0.03, '#8a5f2a'], // Riemen über den Schultern
+    [-0.12, 0.11, 0.7, 0.25, 0.04, 0.03, '#8a5f2a'],
+    [-0.27, -0.11, 0.68, 0.03, 0.03, 0.07, STEM], // drei Stiele, darauf die Hüte in den drei Farben
+    [-0.23, 0.0, 0.68, 0.03, 0.03, 0.09, STEM],
+    [-0.2, -0.07, 0.68, 0.03, 0.03, 0.05, STEM],
+    [-0.3, -0.14, 0.75, 0.09, 0.09, 0.04, SHROOM_COLORS[0], SHROOM_COLORS[0]],
+    [-0.26, -0.03, 0.77, 0.09, 0.09, 0.04, SHROOM_COLORS[1], SHROOM_COLORS[1]],
+    [-0.23, -0.1, 0.73, 0.09, 0.09, 0.04, SHROOM_COLORS[2], SHROOM_COLORS[2]],
+  ],
+  CARRY_DRESS,
+);
 
 /** Kanne aus hellem Stein mit Tropfwasser in der rechten Hand (in der Grotte statt des Eimers; bis zum Steintrog) */
 export const JUG_PARTS: Part[] = [
@@ -44,12 +48,15 @@ export const JUG_PARTS: Part[] = [
  * leuchtender türkiser Kristall in einem Rahmen aus hellem Silber. Kein Gold: In der Hand ist sie keine Aktion mehr;
  * nur auf ihrem Sockel trägt sie einen goldenen Rahmen (Welt-Paket der Höhlenwelt). Kein Feuer, keine Fackel
  */
-export const LANTERN_PARTS: Part[] = [
-  [0.17, -0.36, 0.3, 0.03, 0.03, 0.07, '#8d86a8'], // Bügel bis zur Hand
-  [0.1, -0.43, 0.28, 0.17, 0.17, 0.03, '#c9c4dc', '#e4e0f0'], // Deckel
-  [0.12, -0.41, 0.09, 0.13, 0.13, 0.19, '#8fe0ea', '#d8f6fa'], // Kristall, leuchtet
-  [0.1, -0.43, 0.06, 0.17, 0.17, 0.03, '#c9c4dc', '#e4e0f0'], // Boden
-];
+export const LANTERN_PARTS: Part[] = dress(
+  [
+    [0.17, -0.36, 0.3, 0.03, 0.03, 0.07, '#8d86a8'], // Bügel bis zur Hand
+    [0.1, -0.43, 0.28, 0.17, 0.17, 0.03, '#c9c4dc', '#e4e0f0'], // Deckel
+    [0.12, -0.41, 0.09, 0.13, 0.13, 0.19, '#8fe0ea', '#d8f6fa'], // Kristall, leuchtet
+    [0.1, -0.43, 0.06, 0.17, 0.17, 0.03, '#c9c4dc', '#e4e0f0'], // Boden
+  ],
+  CARRY_DRESS,
+);
 
 /** Funken, wenn die Figur die Kristall-Laterne nimmt: türkis, lila, weiß */
 export const LANTERN_SPARKS = ['#8fe0ea', '#b48cf0', '#ffffff'] as const;

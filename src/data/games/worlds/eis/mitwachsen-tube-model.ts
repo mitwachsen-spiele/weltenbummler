@@ -7,6 +7,7 @@
 
 import type { Part } from '../../../../lib/games/front';
 import { LOOK, figureParts } from '../../mitwachsen';
+import { FIGURE_LEGS } from '../../mitwachsen-fine';
 import { RIDES } from '../../mitwachsen-rides';
 import { GOLD } from '../../mitwachsen-portals';
 import { ICE_COLORS } from './mitwachsen-ice-colors';
@@ -31,7 +32,7 @@ const RING: readonly Part[] = [
 const GRIP: readonly Part[] = [[-0.05, -0.3, 0.24, 0.1, 0.6, 0.07, GOLD.side, GOLD.top]];
 /** Die Figur sitzt im Reifen: ohne Beine, Kopf und Schultern schauen heraus */
 const FIGURE: readonly Part[] = figureParts(LOOK)
-  .slice(4)
+  .slice(FIGURE_LEGS)
   .map(([f, r, z, ...rest]): Part => [f, r, z - 0.28, ...rest]);
 
 /** Der Rodelreifen: leer, mit goldenem Griff (`gold`) oder mit der Figur darin (`rider`) */

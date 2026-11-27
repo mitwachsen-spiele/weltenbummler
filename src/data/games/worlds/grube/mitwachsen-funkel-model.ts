@@ -10,6 +10,7 @@
 import type { Part } from '../../../../lib/games/front';
 import { DIGITS, HALT_NUMBER, numberBadge } from '../../mitwachsen-digits';
 import { LOOK, figureParts } from '../../mitwachsen';
+import { FIGURE_LEGS } from '../../mitwachsen-fine';
 import { GOLD } from '../../mitwachsen-portals';
 
 /** Farben von Funkel (Konzeptseite: Petrol #2f8f83, Dach Creme #f3ead2), je Seite und Oberseite, wo es zwei gibt */
@@ -131,7 +132,7 @@ const LOCO: readonly Part[] = [
 
 /** Die Figur sitzt im ersten Wagen: ohne Beine, Kopf und Schultern schauen oben heraus */
 const FIGURE: readonly Part[] = figureParts(LOOK)
-  .slice(4)
+  .slice(FIGURE_LEGS)
   .map(([f, r, z, ...rest]): Part => [f - 0.02, r, z - 0.02, ...rest]);
 
 /** Bankwagen ohne Dach: Kasten in Petrol, darüber ein Fensterband mit Stegen */

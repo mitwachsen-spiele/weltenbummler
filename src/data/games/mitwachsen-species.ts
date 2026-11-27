@@ -38,4 +38,9 @@ export type SpeciesOf<Id extends string> = {
    * `solo` zeigt es; das Modell bringt das Welt-Paket mit (`WorldPack.solos`)
    */
   solo?: readonly Part[];
+  /**
+   * Grundform ohne die Feinteile (Schnurrhaare, Nasenlöcher, Krallen …, `fineSpecies` in mitwachsen-fine.ts): Aus ihr
+   * rastert „Noch nicht“ den Umriss (`silhouette`), damit Feinteile ihn nicht verdicken oder ein Auge verdecken
+   */
+  outline?: readonly Part[];
 };

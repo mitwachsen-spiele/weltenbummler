@@ -8,6 +8,7 @@
 
 import type { Part } from '../../../../lib/games/front';
 import { LOOK, figureParts } from '../../mitwachsen';
+import { FIGURE_LEGS } from '../../mitwachsen-fine';
 import { GOLD } from '../../mitwachsen-portals';
 import { RIDES } from '../../mitwachsen-rides';
 import { ICE_COLORS } from './mitwachsen-ice-colors';
@@ -70,7 +71,7 @@ const LANTERN: readonly Part[] = [
   [0.39, -0.36, 0.54, 0.12, 0.12, 0.03, IRON],
 ];
 /** Die Figur sitzt im Schlitten: ohne Beine (sie liegen unter der Decke), etwas tiefer, an der Lehne */
-const RIDER: readonly Part[] = shift(figureParts(LOOK).slice(4), -0.22, -0.16);
+const RIDER: readonly Part[] = shift(figureParts(LOOK).slice(FIGURE_LEGS), -0.22, -0.16);
 
 /** Variante des Schlittens */
 export type SledLook = { frame: boolean; pennant: boolean; lamp: boolean; seated: boolean; open: boolean };

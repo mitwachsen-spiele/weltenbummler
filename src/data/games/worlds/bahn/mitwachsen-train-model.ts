@@ -12,6 +12,7 @@
 import type { Part } from '../../../../lib/games/front';
 import { HALT_NUMBER, numberBadge } from '../../mitwachsen-digits';
 import { LOOK, figureParts } from '../../mitwachsen';
+import { FIGURE_LEGS } from '../../mitwachsen-fine';
 import { GOLD } from '../../mitwachsen-portals';
 import { TOK_MODEL } from './mitwachsen-tok-model';
 
@@ -125,7 +126,7 @@ const RIDER: readonly Part[] = TOK_MODEL.map(([f, r, z, ...rest]): Part => [f, r
 
 /** Die Figur sitzt im mittleren Wagen: ohne Beine, Kopf und Schultern schauen oben heraus */
 const FIGURE: readonly Part[] = figureParts(LOOK)
-  .slice(4)
+  .slice(FIGURE_LEGS)
   .map(([f, r, z, ...rest]): Part => [f - 0.05, r, z + 0.06, ...rest]);
 
 /** Offene Tür zur Seite des Bahnsteigs (`side` +1 rechts, −1 links) */

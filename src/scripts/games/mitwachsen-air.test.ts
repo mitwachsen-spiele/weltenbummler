@@ -36,7 +36,9 @@ describe('Kopf in die Böe drehen', () => {
     expect(turned).toHaveLength(body.length + head.filter((p) => p[8] !== 'r').length); // das rechte Auge zeigt nach hinten
     expect(turned.filter((p) => p[8] === 'r').length).toBe(head.filter((p) => p[8] === 'f').length);
     for (const p of turned.filter((p) => p[2] >= 0.74)) {
-      const orig = head.find((o) => o[2] === p[2] && o[3] === p[4] && o[4] === p[3] && o[1] === -(p[0] + p[3]));
+      const orig = head.find(
+        (o) => o[2] === p[2] && o[3] === p[4] && o[4] === p[3] && Math.abs(o[1] + p[0] + p[3]) < 1e-9,
+      );
       expect(orig, JSON.stringify(p)).toBeDefined(); // um die Hochachse gedreht: vorn wird rechts
       expect(p[1]).toBe(orig![0]);
     }

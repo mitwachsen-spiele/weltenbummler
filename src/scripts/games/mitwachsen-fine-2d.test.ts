@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { TILE_D, TILE_W, box, paintWith, projection, type Part } from '../../lib/games/front';
+import { TILE_D, TILE_W, box, drawModel, paintWith, projection, type Part } from '../../lib/games/front';
+import { SPECIES } from '../../data/games/mitwachsen';
 import { CONTACT_KNEE, EDGE_STRIP, contactRadius, faceShade } from '../../lib/games/shade';
 import { SKIN_PERIOD } from '../../lib/games/skins';
 import {
   Fine2D,
+  ICON_PAINTER,
   SPRITE_LIMIT,
   SPRITE_PIXELS,
   Sprites,
@@ -117,6 +119,29 @@ describe('Feine Flächen in 2D', () => {
     pen.face(ctx, { x: 0, y: 0, w: 0.3, h: 10, lu: 0.01, lv: 0.2, side: true }, undefined);
     pen.face(ctx, { x: 0, y: 0, w: 10, h: 10, lu: 0, lv: 0.2, side: true }, undefined);
     expect(log).toEqual([]);
+  });
+
+  it('in Symbolgröße (Leiste unten) nur Verlauf und Oberkante, kein Muster und kein Leuchten', () => {
+    const { ctx, log } = recorder();
+    ICON_PAINTER.face(ctx, { x: 0, y: 0, w: 32, h: 22, lu: 0.5, lv: 0.5, side: false }, { skin: 'fell', halo: true });
+    expect(log.some((l) => l.startsWith('pattern') || l.startsWith('fill pattern'))).toBe(false);
+    expect(log).toContain(`stop 0 ${faceShade(false, true)[0]}`);
+    expect('halo' in ICON_PAINTER).toBe(false);
+    log.length = 0;
+    drawModel(ctx, P, SPECIES.hase.parts, 0.5, 0.5, 0, 'e', 1, undefined, ICON_PAINTER);
+    expect(log.filter((l) => l === 'stroke').length).toBeGreaterThan(0);
+    expect(log.some((l) => l.includes('pattern'))).toBe(false);
+  });
+
+  it('Umrisse (Tafeln, verlorene Tiere) bleiben scharf: kein Muster, kein Verlauf, auch wenn der Kontext fein malt', () => {
+    const { ctx, log } = recorder();
+    paintWith(ctx, new Fine2D());
+    drawModel(ctx, P, SPECIES.fuchs.parts, 0.5, 0.5, 0, 's', 1, '#4b5563');
+    paintWith(ctx, null);
+    expect(log.some((l) => l.includes('pattern') || l.startsWith('stop') || l === 'stroke')).toBe(false);
+    expect(new Set(log.map((l) => l.split(' ')[1]))).toEqual(
+      new Set(['#4b5563', 'rgba(255,255,255,.05)', 'rgba(0,0,0,.18)']),
+    );
   });
 
   it('sammelt Leuchten mit Kennung aus ihrer Lage und gibt sie einmal je Bild ab', () => {

@@ -65,6 +65,9 @@ export function silhouette(parts: readonly Part[]): string[] {
   return rim(cols, rows, hit, (c, r) => hit(c, r, true));
 }
 
+/** Quader, aus denen der Umriss einer Art entsteht: ihre Grundform ohne Feinteile (`outline`), sonst ihr Modell */
+export const shapeOf = (id: SpeciesId): readonly Part[] => SPECIES[id].outline ?? SPECIES[id].parts;
+
 /** Zeilen von oben ('o' golden, '.' leer): die Pixel von `on` am Rand (ein Nachbar fehlt), dazu die aus `keep` */
 const rim = (
   cols: number,
@@ -147,7 +150,7 @@ export function showHint(
 ): HintDraw {
   sfx.score(notYet(id, reduced));
   say(`Noch nicht. Es fehlt noch: ${SPECIES[species].name}`);
-  const rows = silhouette(SPECIES[species].parts);
+  const rows = silhouette(shapeOf(species));
   return (ctx, world, P, now) => hintOutline(ctx, world, P, id, rows, now - since);
 }
 
@@ -188,7 +191,7 @@ export function never() {
     if (id) {
       sfx.score(notYet(id, true)); // ohne Riegel: Diese Tore haben keine Flügel, nichts wackelt
       say(lack ? `Noch nicht. Es fehlt noch: ${SPECIES[lack].name}` : 'Noch nicht.');
-      const rows = lack ? silhouette(SPECIES[lack].parts) : signOutline(id);
+      const rows = lack ? silhouette(shapeOf(lack)) : signOutline(id);
       shown = { t: state.tick, id, at: now, draw: (ctx, w, P, t) => hintOutline(ctx, w, P, id, rows, t - now) };
     }
     return now - (shown.at ?? -1e9) < HINT_MS ? shown : null;

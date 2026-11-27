@@ -38,12 +38,8 @@ export const lilyBoxes = (x: number, y: number): Box[] => [
  * umschließen: `ring` ist der äußere Umriss, `wall` die Breite des Rings rundum
  */
 function collar(ring: Box, wall: number): Box[] {
-  const [x, y, , w, d] = ring;
-  const piece = (px: number, py: number, pw: number, pd: number): Box => {
-    const b: Box = [...ring];
-    [b[0], b[1], b[3], b[4]] = [px, py, pw, pd];
-    return b;
-  };
+  const [x, y, z, w, d, ...rest] = ring;
+  const piece = (px: number, py: number, pw: number, pd: number): Box => [px, py, z, pw, pd, ...rest];
   return [
     piece(x, y, w, wall),
     piece(x, y + wall, wall, d - 2 * wall),

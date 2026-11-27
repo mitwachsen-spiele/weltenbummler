@@ -8,6 +8,7 @@
 
 import type { Part } from '../../../../lib/games/front';
 import { LOOK, figureParts } from '../../mitwachsen';
+import { FIGURE_LEGS } from '../../mitwachsen-fine';
 import { HALT_NUMBER, numberBadge } from '../../mitwachsen-digits';
 import { GOLD } from '../../mitwachsen-portals';
 import { RIDES } from '../../mitwachsen-rides';
@@ -46,7 +47,7 @@ const STEP: readonly Part[] = [
 ];
 /** Die Figur sitzt in der Kabine: ohne Beine, Kopf und Schultern schauen heraus */
 const FIGURE: readonly Part[] = figureParts(LOOK)
-  .slice(4)
+  .slice(FIGURE_LEGS)
   .map(([f, r, z, ...rest]): Part => [f, r, z + 0.02, ...rest]);
 
 /** Die Schneeraupe: Lampe an (`lit`), goldener Tritt (`gold`), die Figur in der Kabine (`rider`) */

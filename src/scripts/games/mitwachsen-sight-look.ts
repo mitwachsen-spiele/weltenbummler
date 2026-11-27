@@ -5,6 +5,7 @@
 // dunklen Grotte (`beacon`). Bei reduzierter Bewegung steht er als ruhiger Punkt an seinem Platz. Dazu die Töne: der
 // Ruf eines Dings ist sein eigener Klang, nur leiser und kürzer (`hush`), der Freund hat ein eigenes helles Zwitschern.
 
+import { dress } from '../../data/games/mitwachsen-fine';
 import { STORIES, type Melody } from '../../data/games/mitwachsen-stories';
 import type { Part } from '../../lib/games/front';
 import type { RideBody } from './mitwachsen-ride-view';
@@ -18,25 +19,32 @@ export const FRIEND_COLORS = { core: '#bff3ff', light: '#ffffff', wing: '#5fd4ff
 const C = FRIEND_COLORS;
 /** Funken, wenn er erscheint, sich freut oder fortfliegt */
 export const SIGHT_SPARKS: readonly string[] = [C.light, C.wing, C.tip, C.tail];
+const GLOW = { [C.core]: { halo: true } } as const;
 /** So hoch schwebt er über dem Boden je Bild der Wippe (Felder) */
 const LIFTS = [1, 1.06, 1.12, 1.06] as const;
 /** Ein Bild der Wippe dauert so lange (ms); so schnell gleitet er zu seinem Feld (ms bis auf ein Drittel des Wegs) */
 const BEAT = 160;
 const GLIDE = 220;
 
-/** Der Freund im Bild `k` der Wippe: Kern, zwei Flügel (oben bei geradem `k`, sonst unten), ein Schweif aus zwei Punkten */
+/**
+ * Der Freund im Bild `k` der Wippe: Kern, zwei Flügel (oben bei geradem `k`, sonst unten), ein Schweif aus zwei Punkten.
+ * Der Kern leuchtet (`halo`), auch am Tag ein wenig
+ */
 export function friendParts(k: number): Part[] {
   const z = LIFTS[k % LIFTS.length]!;
   const wing = k % 2 ? -0.04 : 0.14;
-  return [
-    [-0.15, -0.15, z, 0.3, 0.3, 0.3, C.core, C.light],
-    [-0.08, -0.37, z + wing, 0.18, 0.22, 0.1, C.wing, C.light],
-    [-0.08, 0.15, z + wing, 0.18, 0.22, 0.1, C.wing, C.light],
-    [-0.04, -0.45, z + wing, 0.1, 0.08, 0.08, C.tip, C.tip],
-    [-0.04, 0.37, z + wing, 0.1, 0.08, 0.08, C.tip, C.tip],
-    [-0.3, -0.06, z + 0.08, 0.14, 0.12, 0.12, C.tail, C.tip],
-    [-0.45, -0.04, z + 0.04, 0.1, 0.08, 0.08, C.tip, C.light],
-  ];
+  return dress(
+    [
+      [-0.15, -0.15, z, 0.3, 0.3, 0.3, C.core, C.light],
+      [-0.08, -0.37, z + wing, 0.18, 0.22, 0.1, C.wing, C.light],
+      [-0.08, 0.15, z + wing, 0.18, 0.22, 0.1, C.wing, C.light],
+      [-0.04, -0.45, z + wing, 0.1, 0.08, 0.08, C.tip, C.tip],
+      [-0.04, 0.37, z + wing, 0.1, 0.08, 0.08, C.tip, C.tip],
+      [-0.3, -0.06, z + 0.08, 0.14, 0.12, 0.12, C.tail, C.tip],
+      [-0.45, -0.04, z + 0.04, 0.1, 0.08, 0.08, C.tip, C.light],
+    ],
+    GLOW,
+  );
 }
 const MODELS = LIFTS.map((_, k) => friendParts(k));
 
