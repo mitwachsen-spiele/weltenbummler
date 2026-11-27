@@ -107,7 +107,7 @@ export type Precache = {
 };
 
 /**
- * Alles, was die Seite `entry` (z. B. "/spielen/") braucht, ausgehend von ihrem HTML. `skip` bleibt draußen, etwa der
+ * Alles, was die Seite `entry` (z. B. "/") braucht, ausgehend von ihrem HTML. `skip` bleibt draußen, etwa der
  * Service Worker selbst (den holt der Browser immer aus dem Netz).
  */
 export function precacheList(entry: string, read: ReadFile, origin: string, skip: string[] = []): Precache {

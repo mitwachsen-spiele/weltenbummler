@@ -1,6 +1,7 @@
 // Das Spiel als App: installierbar laut Chromium selbst (DevTools-Protokoll). Eigene Datei, weil `channel` für die
 // ganze Datei gilt (eigener Worker). Spec: docs/specs/mitwachsen.md („App“).
 import { expect, test, type Page } from '@playwright/test';
+import { gotoGame } from './helpers';
 
 type Manifest = { display: string; icons: { src: string }[] };
 
@@ -18,14 +19,13 @@ const objections = async (page: Page) => {
   return { manifest, ids };
 };
 
-for (const path of ['/', '/spielen/'])
-  test(`Seite ${path} ist für Chromium installierbar`, async ({ page }) => {
-    await page.goto(path);
-    const { manifest, ids } = await objections(page);
-    expect(new URL(manifest.url).pathname).toBe('/manifest.webmanifest');
-    expect(manifest.errors).toEqual([]);
-    expect(ids).toEqual([]);
-  });
+test('Das Spiel ist für Chromium installierbar', async ({ page }) => {
+  await gotoGame(page);
+  const { manifest, ids } = await objections(page);
+  expect(new URL(manifest.url).pathname).toBe('/manifest.webmanifest');
+  expect(manifest.errors).toEqual([]);
+  expect(ids).toEqual([]);
+});
 
 // Gegenproben: Die Prüfung sieht wirklich etwas
 test('Gegenprobe: ohne Manifest und mit einem untauglichen Manifest meldet Chromium Einwände', async ({ page }) => {
@@ -39,7 +39,7 @@ test('Gegenprobe: ohne Manifest und mit einem untauglichen Manifest meldet Chrom
     const json = (await res.json()) as Manifest;
     await r.fulfill({ response: res, json: { ...json, display: 'browser', icons: [] } });
   });
-  await page.goto('/');
+  await gotoGame(page);
   const { ids } = await objections(page);
   expect(ids).toEqual(expect.arrayContaining(['manifest-display-not-supported', 'manifest-missing-suitable-icon']));
 });

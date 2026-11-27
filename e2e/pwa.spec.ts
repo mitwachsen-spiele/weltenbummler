@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
 import { gotoGame, reloadGame, watchErrors } from './helpers';
 
 test(
-  'Spiel: Service Worker steuert /spielen/, ohne Netz startet das Spiel trotzdem, samt Eis-Welt und ihrem 3D-Teil',
+  'Spiel: Service Worker steuert die ganze Adresse, ohne Netz startet das Spiel trotzdem, samt Eis-Welt und ihrem 3D-Teil',
   { tag: '@3d' },
   async ({ page, context }) => {
     const errors = watchErrors(page);
@@ -20,12 +20,12 @@ test(
     const reg = await page.evaluate(() =>
       navigator.serviceWorker.ready.then((r) => ({ scope: r.scope, updateViaCache: r.updateViaCache })),
     );
-    expect(new URL(reg.scope).pathname).toBe('/spielen/');
+    expect(new URL(reg.scope).pathname).toBe('/');
     // Die Frage nach einer neuen Version geht am HTTP-Cache vorbei, nie 'all'
     expect(['none', 'imports']).toContain(reg.updateViaCache);
     await expect
       .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null))
-      .toMatch(/\/spielen\/sw\.js$/);
+      .toMatch(/\/sw\.js$/);
     const webgl = await page.evaluate(() => !!document.createElement('canvas').getContext('webgl2'));
     // Spielstand mit offenem Eistor: Beim nächsten Start braucht die Welt das Paket der Eis-Welt gleich
     await game.evaluate((node) => {
@@ -42,7 +42,7 @@ test(
     await reloadGame(page);
     // Auch das nachträglich geladene Three.js kommt ohne Netz aus dem Speicher
     if (webgl) await expect(game).toHaveClass(/three/);
-    expect(fromSw).toContain('/spielen/');
+    expect(fromSw).toContain('/');
     // Auch das Welt-Paket der Eis-Welt (vorab gespeichert) kommt ohne Netz aus dem Speicher: Der Kessel steht samt Eis-Portal
     expect(
       fromSw.some((p) => /\/welt-eis\.[\w-]+\.js$/.test(p)),

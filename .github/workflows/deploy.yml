@@ -25,7 +25,7 @@ permissions:
   contents: read
 
 # Fristen je Job: etwa das 2,5-Fache der Dauer auf 2 CPUs (npm run gates:ci) samt geschätztem Einrichten (Checkout und
-# npm ci etwa 1 min, Browser samt Systempaketen etwa 1,5 min). Gemessen: static 74 s, coverage 76 s, build und verify
+# npm ci etwa 1 min, Browser samt Systempaketen etwa 1,5 min). Gemessen: static 74 s, coverage 238 s (27.11.2026), build und verify
 # wenige Sekunden, e2e-site 9 s, e2e-game 20 s und 119 s. Reißt eine, erst die Ursache suchen; anheben nur mit
 # Begründung in der Commit-Nachricht.
 jobs:
@@ -66,7 +66,8 @@ jobs:
   coverage:
     name: Unit-Tests mit Abdeckung
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    # 238 s in gates:ci × 2,5 + 1 min Einrichten; auf dem Runner zuletzt 217 bis 365 s
+    timeout-minutes: 11
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

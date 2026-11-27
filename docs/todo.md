@@ -5,13 +5,12 @@
 - [ ] Umzug in die Organisation `mitwachsen-spiele` abschließen (DNS, Verifizierung, Pages, Ruleset, Renovate): larmic/mitwachsen-spiele#71
 - [ ] Datenschutzerklärung prüfen lassen
 - [ ] Seite in der Search Console anmelden
-- [x] Texte der Startseite schreiben (`src/data/landing.ts`, erste Fassung 17.11.2026, gegenlesen)
 
 ## Später
 
 - [ ] Teststufe (vorerst zurückgestellt)
 - [ ] Content-Security-Policy
-- [ ] Eltern-Tipp Geführter Zugriff: Eltern auf der Startseite und/oder im Hinweis für Eltern im Spiel erklären, wie das Kind im Spiel bleibt – iPad „Geführter Zugriff“ (Einstellungen → Bedienungshilfen → Geführter Zugriff) und Android „App anheften“ (Bildschirmfixierung). Vorerst nur dieser Punkt, noch kein Text in der Oberfläche
+- [ ] Eltern-Tipp Geführter Zugriff: Eltern auf der Homepage (Repo `website`) und/oder im Hinweis für Eltern im Spiel erklären, wie das Kind im Spiel bleibt – iPad „Geführter Zugriff“ (Einstellungen → Bedienungshilfen → Geführter Zugriff) und Android „App anheften“ (Bildschirmfixierung). Vorerst nur dieser Punkt, noch kein Text in der Oberfläche
 - [ ] Reisewege nach dem Schlitten (Konzept „Reisewege: ein Fahrzeug je Welt“, vom Vater bestätigt am 22.11.2026; der Schlitten ist umgesetzt, Spec „Der Schlitten“):
   - [x] Tok: erscheint erst nach der ersten Heimfahrt mit dem Schlitten (Stufe `fest` in `packs.fahrt.schlitten`; „Tok erscheint“, Schritt 2 der Bahn)
   - [x] `RIDE_PRELOAD` (mit Schritt 5 der Bahn, 24.11.2026): 6 Felder vor einem Halt holt das Spiel die Fahr-Engine und die Ziel-Gegend des Fahrzeugs (`Vehicle.needs`, der Zug: die Grotte; `preloadOf`/`dozingOf` in `src/scripts/games/mitwachsen-preload.ts`), fehlt eines, schläft es freundlich (`State.dozing`, schnarcht, keine goldene Tür); der Schlitten braucht nur die Fahr-Engine

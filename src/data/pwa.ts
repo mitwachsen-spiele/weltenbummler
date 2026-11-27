@@ -6,11 +6,11 @@ export const SKY_1 = '#79c7ea';
 export const SKY_2 = '#8dd0ee';
 
 export const APP = {
-  name: 'Mitwachsen',
-  shortName: 'Mitwachsen',
+  name: 'Weltenbummler',
+  shortName: 'Weltenbummler',
   description: 'Ein ruhiges Spiel für Kinder ab 3 Jahren, gespielt zusammen mit Mama oder Papa.',
   lang: 'de',
-  startUrl: '/spielen/',
+  startUrl: '/',
   // Die ganze Seite, damit „Zum Home-Bildschirm“ auch auf der Startseite die App installiert; gespeichert und
   // offline ist nur das Spiel (Service Worker unten)
   scope: '/',
@@ -32,8 +32,8 @@ export const APP_ICONS = [
 export const ICON_FILL = { any: 0.86, maskable: 0.6 } as const;
 
 export const SERVICE_WORKER = {
-  url: '/spielen/sw.js',
-  scope: '/spielen/', // steuert nur das Spiel, die Startseite bleibt ohne
-  entry: '/spielen/', // von dieser Seite aus wird gesammelt, was vorab gespeichert wird
+  url: '/sw.js',
+  scope: '/', // die ganze Adresse gehört dem Spiel
+  entry: '/', // von dieser Seite aus wird gesammelt, was vorab gespeichert wird
   prefix: 'mitwachsen-', // Präfix der Caches, die der Service Worker anlegt und wieder löscht
 } as const;

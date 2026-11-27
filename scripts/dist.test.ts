@@ -5,8 +5,8 @@ describe('Externe Ressourcen', () => {
   it('erkennt fremde Hosts, auch protokollrelativ; eigene und relative Adressen sind erlaubt', () => {
     expect(isForeign('https://cdn.example.com/x.js')).toBe(true);
     expect(isForeign('//fonts.googleapis.com/css')).toBe(true);
-    expect(isForeign('http://mitwachsen-spiele.de/a.png')).toBe(false);
-    expect(isForeign('https://www.mitwachsen-spiele.de/a.png')).toBe(false);
+    expect(isForeign('http://weltenbummler.mitwachsen-spiele.de/a.png')).toBe(false);
+    expect(isForeign('https://www.mitwachsen-spiele.de/a.png')).toBe(true);
     expect(isForeign('/_astro/a.js')).toBe(false);
     expect(isForeign('data:image/png;base64,AAA')).toBe(false);
   });
@@ -33,9 +33,9 @@ describe('Externe Ressourcen', () => {
   it('erlaubt Links und Hinweise, die nichts laden', () => {
     const html = `
       <a href="https://github.com/mitwachsen-spiele/weltenbummler">GitHub</a>
-      <link rel="canonical" href="https://www.mitwachsen-spiele.de/">
+      <link rel="canonical" href="https://weltenbummler.mitwachsen-spiele.de/">
       <link rel="alternate" href="https://example.com/feed.xml">
-      <meta property="og:image" content="https://www.mitwachsen-spiele.de/og.png">
+      <meta property="og:image" content="https://weltenbummler.mitwachsen-spiele.de/og.png">
       <img src="/_astro/a.webp" alt="">`;
     expect(externalResources(html)).toEqual([]);
   });

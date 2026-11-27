@@ -4,7 +4,7 @@
 //    Links (<a href>) und Hinweise wie canonical sind erlaubt, sie lädt erst ein Klick bzw. niemand.
 // 2. Alte Adressen leiten weiter (Astro schreibt dafür kleine Seiten mit <meta http-equiv="refresh">).
 
-const OWN_HOSTS = new Set(['mitwachsen-spiele.de', 'www.mitwachsen-spiele.de']);
+const OWN_HOSTS = new Set(['weltenbummler.mitwachsen-spiele.de']);
 /** <link rel="…">, die nichts laden */
 const NON_LOADING_REL = new Set([
   'canonical',
@@ -28,7 +28,7 @@ export function isForeign(url: string): boolean {
   const u = url.trim();
   if (!/^(https?:)?\/\//i.test(u)) return false;
   try {
-    return !OWN_HOSTS.has(new URL(u, 'https://www.mitwachsen-spiele.de').hostname);
+    return !OWN_HOSTS.has(new URL(u, 'https://weltenbummler.mitwachsen-spiele.de').hostname);
   } catch {
     return true;
   }

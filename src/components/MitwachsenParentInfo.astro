@@ -2,6 +2,8 @@
 // Hinweis für Eltern zur Bildschirmzeit: steht im Dialog des Spiels (beim ersten Öffnen und über Menü und Sprechblase)
 // und ohne JavaScript im Text der Seite. Quellen sind normale Links, geladen wird erst beim Klick.
 // Stand der Quellen: November 2026. Konzept: docs/games/mitwachsen.md
+import { HOME_URL } from '../data/site';
+
 interface Props {
   headingId: string;
 }
@@ -29,13 +31,13 @@ const { headingId } = Astro.props;
   </dd>
 </dl>
 <p>
-  <strong>So hilft Mitwachsen:</strong> Das Spiel ist ruhig gehalten, belohnt kein schnelles Drücken und ist dafür
+  <strong>So hilft Weltenbummler:</strong> Das Spiel ist ruhig gehalten, belohnt kein schnelles Drücken und ist dafür
   gedacht, es gemeinsam zu spielen. Nach 15 und 20 Minuten wird die Figur müde, und nach 25 Minuten möchte sie ins Bett.
   Das Spiel bricht dabei nichts ab, wann Schluss ist, entscheiden die Eltern.
 </p>
 <p class="mw-store">
   Spielstand und Einstellungen bleiben nur im Browser dieses Geräts, ohne Cookies und ohne Übertragung. Mehr dazu in der
-  <a href="/datenschutz/">Datenschutzerklärung</a>.
+  <a href={`${HOME_URL}datenschutz/`}>Datenschutzerklärung</a>.
 </p>
 <p class="mw-sources">Quellen:</p>
 <ul class="mw-sources">

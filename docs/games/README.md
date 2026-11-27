@@ -4,7 +4,7 @@ Ein Spiel für meinen Sohn, gebaut von mir und gespielt mit uns beiden zusammen.
 
 ## Einleitung (Entwurf, wird später verfeinert)
 
-Grundlage für die Startseite von mitwachsen-spiele.de (siehe [mitwachsen.md](mitwachsen.md), Einbau).
+Grundlage für die Homepage von mitwachsen-spiele.de (Repo `mitwachsen-spiele/website`).
 
 Medienzeit für Kinder ist ein schwieriges Thema. Ganz verbieten möchte ich sie nicht, einfach laufen lassen auch nicht. Ich möchte meinen Sohn behutsam heranführen, so dass er sich damit auseinandersetzt, statt nur zu konsumieren.
 

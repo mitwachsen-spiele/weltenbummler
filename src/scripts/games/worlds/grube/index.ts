@@ -12,7 +12,7 @@
 // Modell und Zeitplan in mitwachsen-dig-model.ts; mit dem Gang kommt der Klangstein `grube` am Halt). Ein 3D-Teil mit
 // Three.js ist nicht nötig: Gleis und Körper
 // sind Quader wie in 2D, darum kommt `view3d` aus derselben Datei. Geladen wird es mit der Grotte (`ALONG` in
-// mitwachsen-packs.ts); der Entwickler-Schalter spielt den gegrabenen Gang vor (`/spielen/?entwickler=grube`,
+// mitwachsen-packs.ts); der Entwickler-Schalter spielt den gegrabenen Gang vor (`/?entwickler=grube`,
 // mitwachsen-dev.ts), mit `&graben=1` das fällige Graben. Nichts außerhalb dieses Ordners importiert statisch von hier (geprüft durch `npm run arch`): im
 // Build `_astro/welt-grube.<hash>.js` mit eigener Grenze (scripts/verify-bundles.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und „Die Grubenbahn Funkel“)
