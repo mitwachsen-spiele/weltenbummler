@@ -50,8 +50,9 @@ export const RULES: Rule[] = [
       // Drehung zur Torfront: kommt erst nach der 3D-Ansicht, wenn die Figur einem Tor nah ist (`NEAR_GATE`)
       { chunks: /\/mitwachsen-turn-3d\.[\w-]+\.js$/, after: /\/mitwachsen-3d\.[\w-]+\.js$/ },
     ],
-    // Gemessen 91 693 Bytes (89,5 KB)
-    budget: 97 * 1024,
+    // Gemessen 95,5 KB (mit feinen Flächen: Muster und Leuchten im Shader, feine Kronen, Pflanzen der Torhäuser;
+    // vorher 92,5 KB): unter 3 % Luft, darum Grenze nach gemessen + 10 %
+    budget: 105.1 * 1024,
     // Three.js liegt nur in seiner eigenen Datei. Proben: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der
     // Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts), den Höhlenhimmel nur im Paket der Grotte
     forbidden: /WebGLRenderer|three\.module|#7fd6ff|#4a4370/,
@@ -106,8 +107,9 @@ export const RULES: Rule[] = [
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Bahn
       { chunks: /\/welt-bahn-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-bahn)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 51,3 KB
-    budget: 56.5 * 1024,
+    // Gemessen 55,2 KB (mit feinen Flächen an Zug, Gleis, Bahnhöfen und Tok; vorher 53,5 KB): unter 3 % Luft, darum
+    // Grenze nach gemessen + 10 %
+    budget: 60.8 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
