@@ -75,7 +75,7 @@ export type ServiceWorkerOptions = {
 
 /** Quelltext des Service Workers */
 export function serviceWorkerSource({ version, files, scope, prefix }: ServiceWorkerOptions): string {
-  return `// Service Worker von Mitwachsen – beim Build erzeugt (src/lib/pwa/sw.ts), nicht von Hand ändern.
+  return `// Service Worker des Spiels – beim Build erzeugt (src/lib/pwa/sw.ts), nicht von Hand ändern.
 'use strict';
 const PREFIX = ${JSON.stringify(prefix)};
 const CACHE = PREFIX + ${JSON.stringify(version)};

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Das Kinderspiel Mitwachsen von Lars Michaelis unter https://weltenbummler.mitwachsen-spiele.de/, im Voxel-Stil. Astro 7, statische Ausgabe, Sprache Deutsch. Das Spiel liegt an der Wurzel `/`. Die Homepage mit der Seite für Eltern und der Datenschutzerklärung liegt in `mitwachsen-spiele/website` (www.mitwachsen-spiele.de); bis Ende November 2026 lag beides in `larmic/mitwachsen-spiele` (Umzug: larmic/mitwachsen-spiele#71).
+Das Kinderspiel Weltenbummler (bis November 2026 „Mitwachsen“; Dateien, Web Component `larmic-mitwachsen`, Cache-Präfix und Speicher-Schlüssel behalten den alten Namen) von Lars Michaelis unter https://weltenbummler.mitwachsen-spiele.de/, im Voxel-Stil. Astro 7, statische Ausgabe, Sprache Deutsch. Das Spiel liegt an der Wurzel `/`. Die Homepage mit der Seite für Eltern und der Datenschutzerklärung liegt in `mitwachsen-spiele/website` (www.mitwachsen-spiele.de); bis Ende November 2026 lag beides in `larmic/mitwachsen-spiele` (Umzug: larmic/mitwachsen-spiele#71).
 
 ## Befehle
 

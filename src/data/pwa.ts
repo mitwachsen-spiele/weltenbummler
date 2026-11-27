@@ -6,8 +6,8 @@ export const SKY_1 = '#79c7ea';
 export const SKY_2 = '#8dd0ee';
 
 export const APP = {
-  name: 'Mitwachsen',
-  shortName: 'Mitwachsen',
+  name: 'Weltenbummler',
+  shortName: 'Weltenbummler',
   description: 'Ein ruhiges Spiel für Kinder ab 3 Jahren, gespielt zusammen mit Mama oder Papa.',
   lang: 'de',
   startUrl: '/',

@@ -1,4 +1,6 @@
-# Spec: Mitwachsen (Stufe ab 3)
+# Spec: Weltenbummler (Stufe ab 3)
+
+Das Spiel hieß bis November 2026 „Mitwachsen“; Dateien, Web Component (`larmic-mitwachsen`), Cache-Präfix und Speicher-Schlüssel tragen den alten Namen weiter.
 
 Verhalten des Spiels unter `/` auf https://weltenbummler.mitwachsen-spiele.de/ (die Seite für Eltern mit „Spiel starten“ ist die Homepage www.mitwachsen-spiele.de, Repo `mitwachsen-spiele/website`). Konzept und Hintergrund: [docs/games/mitwachsen.md](../games/mitwachsen.md).
 
@@ -839,7 +841,7 @@ Das Spiel lässt sich als App auf den Home-Bildschirm legen und startet danach a
 
 | Was | Regel |
 | --- | --- |
-| Manifest | `/manifest.webmanifest`, beim Build erzeugt: Name „Mitwachsen“, `lang` de, `start_url`, `id` und `scope` `/`, `display` standalone (Uhr und Akku bleiben sichtbar, Vollbild gibt es im Menü), Farben `--sky-1`. **Keine `orientation`:** Das Spiel dreht sich mit dem Gerät |
+| Manifest | `/manifest.webmanifest`, beim Build erzeugt: Name „Weltenbummler“, `lang` de, `start_url`, `id` und `scope` `/`, `display` standalone (Uhr und Akku bleiben sichtbar, Vollbild gibt es im Menü), Farben `--sky-1`. **Keine `orientation`:** Das Spiel dreht sich mit dem Gerät |
 | Icons | Grasblock auf Himmel (`--sky-2`), beim Build gerendert: 192 und 512 px, dazu je eine maskierbare Fassung mit Rand (Würfel auf 60 %, bleibt im sicheren Kreis von 80 %); dazu wie bisher `apple-touch-icon` |
 | Kopfdaten | Jede Seite verweist auf das Manifest, setzt `theme-color` und `apple-mobile-web-app-*` |
 | Service Worker | `/sw.js`, Gültigkeit (`scope`) die ganze Adresse `/`. Angemeldet nur von der Spielseite, nach dem Laden (die Anmeldung kommt per `import()` in eigener Datei nach dem Kern; sie wartet ohnehin aufs Laden, `readyState`), nur im fertigen Build, mit `updateViaCache: 'none'` (die Frage nach einer neuen Version geht nie über den HTTP-Cache); Fehler bleiben still, das Spiel läuft auch ohne |
