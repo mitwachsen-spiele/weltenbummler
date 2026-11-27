@@ -200,6 +200,7 @@ describe('Der Zug fährt immer vorwärts: er dreht nur bei der Abfahrt hinter Da
       const car = full.cars[kind];
       expect(full.puffs.some((p) => Math.hypot(p.x - car.x, p.y - car.y) < 1e-6 && p.z === car.z)).toBe(true);
     }
+    expect(full.puffs.map((p) => p.foot)).toEqual([0, 0, 0]); // Dampf schwebt: kein Fleck am Boden
     const [plo, phi] = hull(full.puffs[0]!.parts);
     expect(phi[0]! - plo[0]!).toBeCloseTo(PUFF);
     // jede Form eines Wagens, gedreht in jede Richtung (quer wie längs liegt sie in der Kugel)

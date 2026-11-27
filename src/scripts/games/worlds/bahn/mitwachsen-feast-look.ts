@@ -9,6 +9,7 @@
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Schmuck mit Zug)
 
 import type { Part } from '../../../../lib/games/front';
+import { fine } from '../../../../data/games/mitwachsen-fine';
 import { CAVE_SPECIES } from '../../../../data/games/mitwachsen-hoehle';
 import { TRAIN_COLORS } from '../../../../data/games/worlds/bahn/mitwachsen-train-model';
 import type { RideEvent } from '../../mitwachsen-pack-types';
@@ -66,10 +67,13 @@ export const batOf = (state?: Pick<State, 'animals'>) => state?.animals.find((a)
 
 /** So viele Glühwürmchen folgen dem Zug, so weit hinter dem letzten Wagen (Felder), so weit auseinander */
 export const FLIES = { n: 5, behind: 0.6, apart: 0.7 } as const;
-/** Glühwürmchen: dunkelgrüner Körper, leuchtendes Hinterteil (an) oder nur der Körper (aus), einmal je Sekunde */
+/**
+ * Glühwürmchen: dunkelgrüner Körper, leuchtendes Hinterteil (an; es leuchtet weich in den Raum, `halo`) oder nur der
+ * Körper (aus), einmal je Sekunde
+ */
 const FLY_ON: readonly Part[] = [
   [-0.05, -0.04, 0, 0.1, 0.08, 0.06, '#2f5a2a'],
-  [-0.13, -0.05, -0.01, 0.09, 0.1, 0.08, '#d8ff6a'],
+  fine([-0.13, -0.05, -0.01, 0.09, 0.1, 0.08, '#d8ff6a'], { halo: true }),
 ];
 const FLY_OFF: readonly Part[] = [[-0.05, -0.04, 0, 0.1, 0.08, 0.06, '#2f5a2a']];
 
@@ -92,7 +96,8 @@ export function fireflies(
     const z = h + 0.9 + 0.25 * Math.sin(t * 2.4);
     const sway = 0.3 * Math.sin(t * 1.7 + i);
     const k = `bahn:gluehwurm:${+on}`;
-    return [{ id: `bahn:gluehwurm:${i}`, key: k, x: x + sway, y: y - sway, z, dir: 's', parts: on ? FLY_ON : FLY_OFF }];
+    const parts = on ? FLY_ON : FLY_OFF;
+    return [{ id: `bahn:gluehwurm:${i}`, key: k, x: x + sway, y: y - sway, z, dir: 's', parts, foot: 0 }]; // sie schweben
   });
 }
 

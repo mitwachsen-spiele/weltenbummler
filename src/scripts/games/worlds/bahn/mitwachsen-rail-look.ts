@@ -6,32 +6,50 @@
 // drei Stufen). Bau 2: Ab der Abfahrt steht Ausbau 2 im Spielstand, doch bis Tok am Prellbock klopft, wartet der Bau
 // (`State.work` ohne Ende, Fortschritt 0): Der Prellbock steht, durch die Tür liegt noch nichts; dann versinkt er
 // (`BUILD2.sink`) und die Gleiswelle läuft durch Gang und Grotte (`BUILD2.wave`). Liegt nichts, zeigt sich das Feld wie sonst (Gras, Büschel, Blumen). Teil des Pakets der Bahn
-// (view-2d.ts, view-3d.ts).
+// (view-2d.ts, view-3d.ts). Fein (Entwurf „Feine Grafik“, Issue 13): Schwellen mit Holz, Schienen und Puffer mit Metall,
+// der Prellbock aus Lack, das Grasdach des Tunnelportals als Laub; Stein (Pfeiler, Sturz, Einschnitt) ohne Muster.
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Gleis als Boden)
 
 import { BUILD, BUILD2, RAIL_COLORS } from '../../../../data/games/worlds/bahn/mitwachsen-bahn';
+import type { Fine } from '../../../../lib/games/front';
 import type { Cell, Rail } from '../../mitwachsen-cell';
 import type { Box, DecoAt, DrawRails } from '../../mitwachsen-view';
 import { builtOf } from './mitwachsen-built';
 
-/** Quader in einem Feld, ohne Lage: x, y (nach vorn), z über dem Boden, Breite, Tiefe, Höhe, Seite, oben */
-type Local = readonly [number, number, number, number, number, number, string, string];
+/** Quader in einem Feld, ohne Lage: x, y (nach vorn), z über dem Boden, Breite, Tiefe, Höhe, Seite, oben, Feinheit */
+type Local = readonly [number, number, number, number, number, number, string, string, Fine?];
 
 const [P1, P2, W] = [0.2, 0.71, 0.09]; // Schienen: Abstand vom Rand links und rechts, Breite
 const RAIL_Z = 0.06; // Schienen liegen auf den Schwellen
-const sleeper = (y: number): Local => [0.06, y, 0, 0.88, 0.22, RAIL_Z, ...RAIL_COLORS.sleeper];
-const rail = (x: number, y: number, d: number): Local => [x, y, RAIL_Z, W, d, 0.07, ...RAIL_COLORS.rail];
+/** Feinheit je Teil des Gleises */
+export const RAIL_FINE = {
+  sleeper: { skin: 'holz' },
+  rail: { skin: 'metall' },
+  buffer: { skin: 'lack' },
+  grass: { skin: 'blatt' },
+} as const satisfies Record<string, Fine>;
+const sleeper = (y: number): Local => [0.06, y, 0, 0.88, 0.22, RAIL_Z, ...RAIL_COLORS.sleeper, RAIL_FINE.sleeper];
+const rail = (x: number, y: number, d: number): Local => [
+  x,
+  y,
+  RAIL_Z,
+  W,
+  d,
+  0.07,
+  ...RAIL_COLORS.rail,
+  RAIL_FINE.rail,
+];
 
 /** Gerade von oben nach unten */
 const STRAIGHT: readonly Local[] = [sleeper(0.1), sleeper(0.6), rail(P1, 0, 1), rail(P2, 0, 1)];
 /** Kurve von oben nach rechts: die Schienen treffen sich innen bei (P2, P1), außen bei (P1, P2) */
 const CURVE: readonly Local[] = [
   sleeper(0.06),
-  [0.72, 0.06, 0, 0.22, 0.88, RAIL_Z, ...RAIL_COLORS.sleeper],
+  [0.72, 0.06, 0, 0.22, 0.88, RAIL_Z, ...RAIL_COLORS.sleeper, RAIL_FINE.sleeper],
   rail(P2, 0, P1 + W),
   rail(P1, 0, P2 + W),
-  [P2, P1, RAIL_Z, 1 - P2, W, 0.07, ...RAIL_COLORS.rail],
-  [P1, P2, RAIL_Z, 1 - P1, W, 0.07, ...RAIL_COLORS.rail],
+  [P2, P1, RAIL_Z, 1 - P2, W, 0.07, ...RAIL_COLORS.rail, RAIL_FINE.rail],
+  [P1, P2, RAIL_Z, 1 - P1, W, 0.07, ...RAIL_COLORS.rail, RAIL_FINE.rail],
 ];
 /**
  * Prellbock quer über dem Gleis, `y` seine Vorderkante (nach unten), mit zwei dunklen Puffern zur Strecke hin (oben);
@@ -41,9 +59,9 @@ const buffer = (y: number, sunk = 0): Local[] => {
   const k = 1 - sunk;
   if (k <= 0) return [];
   return [
-    [0.08, y, 0, 0.84, 0.3, 0.45 * k, ...RAIL_COLORS.buffer],
+    [0.08, y, 0, 0.84, 0.3, 0.45 * k, ...RAIL_COLORS.buffer, RAIL_FINE.buffer],
     ...(k > 0.5
-      ? ([0.16, 0.64].map((x) => [
+      ? [0.16, 0.64].map((x): Local => [
           x,
           y - 0.05,
           0.22 * k,
@@ -52,7 +70,8 @@ const buffer = (y: number, sunk = 0): Local[] => {
           0.14 * k,
           RAIL_COLORS.pads,
           RAIL_COLORS.pads,
-        ]) as Local[])
+          RAIL_FINE.rail,
+        ])
       : []),
   ];
 };
@@ -64,7 +83,7 @@ const PORTAL: readonly Local[] = [
   [0, 0.3, 0, 0.14, 0.4, 1.5, ...RAIL_COLORS.stone],
   [0.86, 0.3, 0, 0.14, 0.4, 1.5, ...RAIL_COLORS.stone],
   [-0.04, 0.26, 1.5, 1.08, 0.48, 0.28, ...RAIL_COLORS.stone],
-  [0, 0.28, 1.78, 1, 0.44, 0.1, ...RAIL_COLORS.grass],
+  [0, 0.28, 1.78, 1, 0.44, 0.1, ...RAIL_COLORS.grass, RAIL_FINE.grass],
 ];
 /** Einschnitt: niedrige Steinwände links und rechts der Geraden, oben Gras */
 const CUT: readonly Local[] = [
@@ -75,10 +94,10 @@ const CUT: readonly Local[] = [
 
 /** Vierteldrehungen im Uhrzeigersinn (oben → rechts) um die Mitte des Felds */
 function turn(b: Local, k: number): Local {
-  const [, , z, , , h, side, top] = b;
+  const [, , z, , , h, side, top, fine] = b;
   let [x, y, w, d] = [b[0], b[1], b[3], b[4]];
   for (let i = 0; i < k; i++) [x, y, w, d] = [1 - (y + d), x, d, w];
-  return [x, y, z, w, d, h, side, top];
+  return [x, y, z, w, d, h, side, top, fine];
 }
 /** Vierteldrehungen, die die Richtung oben (`n`) in die Richtung `l` bringen */
 const QUARTER: Readonly<Record<string, number>> = { n: 0, e: 1, s: 2, w: 3 };
@@ -154,7 +173,9 @@ export const railBoxes: DrawRails = (c: Cell, x: number, y: number, at) => {
   const own = r.part === 'portal' ? PORTAL : r.part === 'cut' ? CUT : sinking ? stub : form;
   const q = r.part === 'portal' || r.part === 'cut' ? shape(r.to)[1] : k;
   return own.map((b): Box => {
-    const [bx, by, bz, w, d, h, side, top] = turn(b, q);
-    return [x + bx, y + by, c.h + bz, w, d, h, side, top];
+    const [bx, by, bz, w, d, h, side, top, fine] = turn(b, q);
+    return fine
+      ? [x + bx, y + by, c.h + bz, w, d, h, side, top, undefined, fine]
+      : [x + bx, y + by, c.h + bz, w, d, h, side, top];
   });
 };

@@ -147,9 +147,32 @@ export function railsOrder(
   return c.gate ? { now: rails, later: [], deco: true } : { now: [], later: rails, deco: false };
 }
 
+/** Weicher Fleck am Boden unter einem Teil des Gleises: Mitte (x, y), Höhe des Bodens, Halbbreite */
+export type RailFoot = readonly [number, number, number, number];
+/**
+ * Ab `low` steht ein Teil des Gleises (Prellbock, Pfeiler des Tunnelportals; Schwellen sind flacher), bis `long` ist es
+ * kompakt; unter `full` (Höhe des Prellbocks) wird sein Fleck mit der Höhe kleiner, so schrumpft er beim Versinken stetig
+ */
+const RAIL_STANDS = { low: 0.1, full: 0.45, long: 0.9 } as const;
+/**
+ * Wo das Gleis eines Felds einen weichen Fleck auf den Boden wirft (nur 2D; in 3D macht das die Sonne): unter jedem
+ * stehenden, kompakten Teil, das auf dem Boden steht (Prellbock, Pfeiler des Portals), nicht unter Schwellen, Schienen,
+ * dem Sturz oder den langen Wänden des Einschnitts; ein niedriges Teil (versinkender Prellbock, Bau 2) mit kleinerem Fleck
+ */
+export const railFeet = (c: Pick<Cell, 'h'>, boxes: readonly Box[]): RailFoot[] =>
+  boxes
+    .filter((b) => Math.abs(b[2] - c.h) < 1e-9 && b[5] >= RAIL_STANDS.low && Math.max(b[3], b[4]) <= RAIL_STANDS.long)
+    .map((b): RailFoot => [
+      b[0] + b[3] / 2,
+      b[1] + b[4] / 2,
+      c.h,
+      ((b[3] + b[4]) / 4) * Math.min(1, b[5] / RAIL_STANDS.full),
+    ]);
+
 /**
  * Gleis eines Felds mit Strecke (`Cell.ride`) in 2D zeichnen (`railsOrder`; `rails` fragt die Pakete, nur dort): gleich
- * oder in `later`; false, wenn das Feld sonst nichts mehr zeigt (liegt kein Gleis, true)
+ * oder in `later`; false, wenn das Feld sonst nichts mehr zeigt (liegt kein Gleis, true). `shadow` zeichnet vorher
+ * die weichen Flecken unter stehenden Teilen (`railFeet`)
  */
 export function placeRails(
   ctx: CanvasRenderingContext2D,
@@ -157,9 +180,11 @@ export function placeRails(
   c: Cell,
   rails: () => readonly Box[] | null | undefined,
   later: Box[],
+  shadow?: (foot: RailFoot) => void,
 ): boolean {
   const boxes = c.ride ? rails() : null;
   if (!boxes) return true;
+  if (shadow) for (const f of railFeet(c, boxes)) shadow(f);
   const order = railsOrder(c, boxes);
   for (const b of order.now) drawBox(ctx, P, b);
   later.push(...order.later);

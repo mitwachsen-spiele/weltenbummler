@@ -44,7 +44,7 @@ import {
 } from '../../data/games/mitwachsen';
 import { carried } from './mitwachsen-carry';
 import { grown } from './mitwachsen-growth';
-import { drawBox, drawDeco, placeRails, type Box, type DecoAt, type View2D } from './mitwachsen-view';
+import { drawBox, drawDeco, placeRails, type Box, type DecoAt, type RailFoot, type View2D } from './mitwachsen-view';
 import { decoBoxes } from './mitwachsen-deco-look';
 import {
   SIGN_TOP,
@@ -667,7 +667,9 @@ export class Renderer {
     const c = grown(world.seed, state.day, x, y, world.cell(x, y)); // mit allem, was schon nachgewachsen ist
     const { ctx } = this;
     // Gleis (Paket der Bahn) statt Büscheln, Blumen und Deko; unter der Tür des Höhlentors die Tür darüber (`placeRails`)
-    if (!placeRails(ctx, P, c, () => this.first((v) => v.rails?.(c, x, y, this.at)), this.later)) return;
+    const rails = () => this.first((v) => v.rails?.(c, x, y, this.at));
+    const foot = ([fx, fy, fz, f]: RailFoot) => contactShadow(ctx, P, fx, fy, fz, f);
+    if (!placeRails(ctx, P, c, rails, this.later, foot)) return;
     const h = c.h;
     if (c.tufts) this.tufts(P, x, y, h, c.tufts);
     // Dinge einer Welt (Iglu, Eisschale, Wassertrog, Fischkiste, Kristallwand) zeichnet ihr Welt-Paket; solange es lädt,

@@ -1,11 +1,14 @@
 // Modelle von Bahnhof Fledermaus in der Grotte, nur im Paket der Bahn (Teile wie in `front.ts`: vorn,
 // rechts, unten, Länge, Breite, Höhe, Farbe, oben; eigene Voxel-Grafik, keine Lore, keine Druse). Mit Bau 2 entsteht
 // er: der Bahnsteig aus lila geschichtetem Stein (in den Schichten des Höhlentors, `BANDS`), eine Stufe über dem Gleis,
-// mit heller lila Kante; ein kleines, hohes Steindach auf zwei Pfosten hinten mit Kristall-Lampen obendrauf (nur hell gefärbt, kein Licht) und
+// mit heller lila Kante; ein kleines, hohes Steindach auf zwei Pfosten hinten mit Kristall-Lampen obendrauf (der Schein leuchtet weich, kein Punktlicht) und
 // dem Schild „Fledermaus auf Lila“ (ohne Text). Kein Bau daneben: Tok steht auf seinem Platz im Freien. Kein Gold: Hier gibt es nichts zu tun.
+// Fein (Entwurf „Feine Grafik“, Issue 13): Der Schein obenauf jeder Kristall-Lampe leuchtet weich in den Raum (`halo`),
+// das Schild ist aus Lack; Stein (Bahnsteig, Pfosten, Dach) bekommt kein Muster, nur Verlauf und Kante.
 // Spec: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 2)
 
 import type { Part } from '../../../../lib/games/front';
+import { fine } from '../../mitwachsen-fine';
 import { HALT_NUMBER, numberBadge } from '../../mitwachsen-digits';
 import { BAT, ROOF_TOP, pixels, roofPlate, roofPosts } from './mitwachsen-train-model';
 
@@ -34,10 +37,13 @@ export const batRowParts = (odd: boolean): Part[] => [
   ...[0, 1, 2].map((k): Part => [-1.03, -0.5, -1 + k * 0.34, 0.04, 1, 0.34, B.bands[(k + +odd) % B.bands.length]!]),
 ];
 
-/** Kristall-Lampe auf dem Dach (auf der Oberkante der Platte): kleiner Kristall in einer Farbe mit hellem Schein obendrauf */
+/**
+ * Kristall-Lampe auf dem Dach (auf der Oberkante der Platte): kleiner Kristall in einer Farbe mit hellem Schein
+ * obendrauf, der weich leuchtet
+ */
 const lamp = (f: number, r: number, c: string): Part[] => [
   [f, r, ROOF_TOP, 0.14, 0.14, 0.22, c, B.glow],
-  [f + 0.03, r + 0.03, ROOF_TOP + 0.22, 0.08, 0.08, 0.1, B.glow, B.glow],
+  fine([f + 0.03, r + 0.03, ROOF_TOP + 0.22, 0.08, 0.08, 0.1, B.glow, B.glow], { halo: true }),
 ];
 
 /**
@@ -55,7 +61,7 @@ export const BAT_POSTS: readonly Part[] = roofPosts(B.bands[0]);
 
 /** Schild auf dem Dach, zur Kamera: Fledermaus auf Lila, ohne Text */
 export const BAT_SIGN: readonly Part[] = [
-  [-0.03, -0.44, 0.16, 0.06, 0.88, 0.88, B.sign, B.sign],
+  fine([-0.03, -0.44, 0.16, 0.06, 0.88, 0.88, B.sign, B.sign], { skin: 'lack' }),
   ...pixels(BAT, B.bat, 0.03, 0, 0.94, 0.09),
   ...numberBadge(HALT_NUMBER.fledermaus, 0.045, -0.31, 1.03), // oben rechts im Bild: Bahnhof 2 (Issue 40)
 ];

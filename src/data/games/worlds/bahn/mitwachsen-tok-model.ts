@@ -1,13 +1,18 @@
 // Modell von Tok, dem Gleisbauer, nur im Paket der Bahn (Teile wie in `front.ts`: vorn, rechts, unten, Länge, Breite,
 // Höhe, Farbe, oben). Nach der Skizze „Tok von vorn“ im Konzept, mit den Farben aus dem Konzept: rund, großer Kopf,
-// kurze Beine, etwa 0,8-mal so groß wie die Figur; roter Helm mit gelbem Lampenblock (nur hell gefärbt, kein Licht), oben
+// kurze Beine, etwa 0,8-mal so groß wie die Figur; roter Helm mit gelbem Lampenblock (leuchtet weich, kein Punktlicht), oben
 // sitzt der Maulwurf mit rosa Händen und heller Brille, weißgrauer Schnurrbart, rosa Wangen, oranges Hemd, moosgrüne
 // Latzhose, braune Stiefel, die Spitzhacke über der Schulter (Holzstiel, grauer T-Kopf). Bewusst nicht Cyan mit Blau und
 // kein Gold. Keine Zähne. Der Kern kennt Name, Ton und Gangart (`TOK_SPECIES` in mitwachsen-hoehle.ts); das Modell trägt
 // die Spielseite ein, wenn das Paket ankommt (`addModels`).
+// Fein (Entwurf „Feine Grafik“, Issue 13): Stoff auf Hemd und Latzhose, Lack auf Helm und Stiefeln, Holz am Stiel und
+// Metall am Kopf der Hacke, Fell auf Schnurrbart und Maulwurf, die Helmlampe leuchtet (`halo`); dazu eine Brusttasche am
+// Latz und zwei Knöpfe an den Trägern (silbern, kein Gold). Den Glanz in den Augen hat `eyes` schon. Die Zusatzteile
+// ändern den Umriss nicht, den „Noch nicht“ aus dem Modell rastert.
 // Spec: docs/specs/mitwachsen.md („Tok und die Bahn“, Tok erscheint)
 
 import { eyes, type Part } from '../../../../lib/games/front';
+import { dress, type Dress } from '../../mitwachsen-fine';
 
 /** Farben von Tok (Konzept „Der Gleisbauer Tok“) */
 export const TOK_COLORS = {
@@ -26,6 +31,8 @@ export const TOK_COLORS = {
   mole: '#2e2b33',
   pink: '#f2a7b8',
   glass: '#e8e4f3',
+  pocket: '#4c6a2e',
+  button: '#d9dce6',
 } as const;
 
 /** Lila-graue Steinkrümel, wenn Tok erscheint (statt Schnee wie beim Pinguin) */
@@ -45,8 +52,33 @@ const s = (x: number, y: number, z: number, w: number, h: number, d: number, c: 
 
 const C = TOK_COLORS;
 
+/** Muster je Farbe: Stoff, Lack, Holz, Metall, Fell; die Helmlampe leuchtet */
+const TOK_DRESS: Dress = {
+  [C.shirt]: { skin: 'stoff' },
+  [C.overall]: { skin: 'stoff' },
+  [C.pocket]: { skin: 'stoff' },
+  [C.helm]: { skin: 'lack' },
+  [C.brim]: { skin: 'lack' },
+  [C.boot]: { skin: 'lack' },
+  [C.wood]: { skin: 'holz' },
+  [C.pick]: { skin: 'metall' },
+  [C.stache]: { skin: 'fell' },
+  [C.mole]: { skin: 'fell' },
+  [C.lamp]: { halo: true },
+};
+
+/**
+ * Zusatzteile: Brusttasche am Latz, zwei Knöpfe an den Trägern. Keine Sohlen vorn an den Stiefeln (wie im Entwurf): Sie
+ * ragten vor die Stiefel und machten den Umriss für „Noch nicht“ an der Spitze dicker
+ */
+const DETAILS: readonly Part[] = [
+  s(-0.06, 0.3, -0.225, 0.12, 0.1, 0.015, C.pocket),
+  s(-0.22, 0.6, -0.228, 0.04, 0.04, 0.008, C.button),
+  s(0.18, 0.6, -0.228, 0.04, 0.04, 0.008, C.button),
+];
+
 /** Tok von vorn ohne den Maulwurf (der sitzt in `MOLE_ON_HELM`) */
-const TOK_ALONE: readonly Part[] = [
+const TOK_BASE: readonly Part[] = [
   // Spitzhacke hinten über der Schulter: Stiel aus vier Voxeln Holz, Kopf als flaches T in Felsgrau
   ...[0, 1, 2, 3].map((i) => s(0.36 + i * 0.05, 0.42 + i * 0.2, 0.05, 0.09, 0.2, 0.09, C.wood)),
   s(0.12, 1.18, 0.02, 0.62, 0.08, 0.12, C.pick),
@@ -79,8 +111,10 @@ const TOK_ALONE: readonly Part[] = [
   s(-0.08, 1.17, -0.32, 0.16, 0.14, 0.03, C.lamp),
 ];
 
+const TOK_ALONE = dress([...TOK_BASE, ...DETAILS], TOK_DRESS);
+
 /** Der Maulwurf oben auf dem Helm: Körper, Schnauze, rosa Nase, helle Brille, rosa Hände (er winkt) */
-const MOLE_ON_HELM: readonly Part[] = [
+const MOLE_PARTS: readonly Part[] = [
   s(-0.15, 1.36, -0.13, 0.3, 0.16, 0.3, C.mole, '#3a3640'),
   s(-0.09, 1.38, -0.18, 0.18, 0.1, 0.05, C.mole),
   s(-0.04, 1.42, -0.2, 0.08, 0.05, 0.02, C.pink),
@@ -89,6 +123,8 @@ const MOLE_ON_HELM: readonly Part[] = [
   s(-0.25, 1.42, -0.12, 0.1, 0.06, 0.1, C.pink),
   s(0.15, 1.42, -0.12, 0.1, 0.06, 0.1, C.pink),
 ];
+
+const MOLE_ON_HELM = dress(MOLE_PARTS, TOK_DRESS);
 
 /** Tok von vorn, wie er steht und hüpft (Gangart `huepfen`), mit dem Maulwurf auf dem Helm */
 export const TOK_MODEL: readonly Part[] = [...TOK_ALONE, ...MOLE_ON_HELM];
