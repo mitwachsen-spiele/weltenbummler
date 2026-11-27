@@ -16,6 +16,7 @@ import {
   octagon,
   octagonReach,
   PINNA,
+  SPARK,
   palmBoxes,
   spread,
   stemPieceRadius,
@@ -24,7 +25,9 @@ import {
   type GateBox,
 } from './mitwachsen-gate-flora';
 import { PALMS } from './mitwachsen-gate-sand';
-import { treeAt, treeLit } from './mitwachsen-gate-lava';
+import { build as buildLava, treeAt, treeLit } from './mitwachsen-gate-lava';
+import { partHalos, parts, plantInto } from './mitwachsen-gate-kit';
+import { HALO_MAX } from '../../lib/games/shade';
 
 const top = (b: GateBox) => b[1] + b[4];
 const far = (b: GateBox) => b[2] + b[5];
@@ -170,6 +173,28 @@ describe('Glutbaum am Lavator', () => {
       expect(Math.max(...[...solid, ...bright].map(far))).toBeLessThan(0.5);
       expect(clashes(spread(bright))).toEqual([]);
     });
+
+  it('leuchtet weich: kompakte Teile der Krone und die Funken melden ihr Leuchten (`halo`), der lange Riss nicht', () => {
+    const t = treeAt([0, 1]);
+    const { solid, bright } = glowTreeBoxes(t, treeLit(1));
+    const p = parts();
+    plantInto(p, solid);
+    expect(partHalos(p)).toEqual([]); // der Stamm leuchtet nicht
+    plantInto(p, bright, true);
+    const halos = partHalos(p);
+    const sparks = halos.filter((h) => h.color === SPARK);
+    expect(sparks).toHaveLength(6); // zwei Funken je Ballen
+    expect(halos.length).toBeGreaterThan(6); // dazu kompakte Teile der Krone
+    expect(halos.length).toBeLessThanOrEqual(16); // gemessen 11: 6 Funken, 5 Teile der Krone (im Rahmen von `haloPick`)
+    expect(halos.every((h) => h.size <= HALO_MAX)).toBe(true);
+    expect(halos.some((h) => h.color === glowColors(0.75).crack)).toBe(false); // Riss: zu lang
+    // Torhaus-Koordinaten wie ein Modell: z ist die Höhe (in der Krone), y nach vorn (vor der Mitte des Baums)
+    expect(Math.min(...halos.map((h) => h.z))).toBeGreaterThan(t.h - 1);
+    // das ganze Lavator baut sie mit
+    const gate = parts();
+    buildLava(gate, { open: 0, outline: false, lit: 0, cam: [0, 1] });
+    expect(partHalos(gate)).toHaveLength(halos.length);
+  });
 
   it('glüht heller, sobald der Weg frei ist', () => {
     expect(treeLit(0)).toBe(0.75);

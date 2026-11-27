@@ -338,7 +338,8 @@ export class World3D {
 
   /** Leuchten kompakter Teile in diesem Bild (Stücke um die Figur, Modelle), für den Durchgang auf der Ebene darüber */
   halos(): (HaloAt & { id: string })[] {
-    return [...[...this.chunks.values()].flatMap((c) => c.halos), ...this.bodyHalos, ...this.notes.halos];
+    const chunks = [...this.chunks.values()].flatMap((c) => c.halos);
+    return [...chunks, ...this.bodyHalos, ...this.notes.halos, ...this.houses.halos()]; // samt Glutkrone am Lavator
   }
 
   /** Blick der Kamera und Nebelrand für das Leuchten auf der Ebene darüber (mitwachsen-halo.ts) */
