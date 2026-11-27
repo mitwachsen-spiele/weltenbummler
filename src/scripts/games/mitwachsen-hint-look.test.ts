@@ -15,6 +15,7 @@ import {
   never,
   notYet,
   showHint,
+  shapeOf,
   signOutline,
   silhouette,
 } from './mitwachsen-hint-look';
@@ -49,7 +50,7 @@ describe('„Noch nicht“: Umriss dessen, was fehlt', () => {
     const seen = new Set<string>();
     let eyed = 0;
     for (const sp of ALL) {
-      const rows = silhouette(SPECIES[sp].parts);
+      const rows = silhouette(shapeOf(sp));
       const cols = rows[0]!.length;
       expect(
         rows.every((r) => r.length === cols),
@@ -63,7 +64,7 @@ describe('„Noch nicht“: Umriss dessen, was fehlt', () => {
         .split('')
         .filter((c) => c === 'o').length;
       expect(gold, sp).toBeGreaterThan(SIL);
-      const plain = silhouette(SPECIES[sp].parts.filter((p) => p[8] !== 'r')); // ohne Augen der Seite
+      const plain = silhouette(shapeOf(sp).filter((p) => p[8] !== 'r')); // ohne Augen der Seite
       const count = (rs: string[]) => rs.join('').split('o').length - 1;
       expect(count(rows), `${sp}: Auge`).toBeGreaterThanOrEqual(count(plain));
       if (count(rows) > count(plain)) eyed++; // das Auge sitzt innen (sonst liegt es auf dem Rand, wie beim Frosch)
@@ -82,8 +83,29 @@ describe('„Noch nicht“: Umriss dessen, was fehlt', () => {
     expect(eyed).toBeGreaterThanOrEqual(ALL.length - 2);
   });
 
+  it('Feinteile (Schnurrhaare, Nasenlöcher, Beine …) ändern den Umriss nie: er kommt aus der Grundform jeder Art', () => {
+    for (const sp of LICHTUNG) {
+      const base = shapeOf(sp);
+      expect(base.length, sp).toBeLessThan(SPECIES[sp].parts.length); // jede Art der Lichtung hat Feinteile
+      // die Grundform ist der Anfang des Modells (gleiche Quader, ohne Muster), die Feinteile kommen dahinter
+      expect(
+        SPECIES[sp].parts.slice(0, base.length).map((p) => p.slice(0, 7)),
+        sp,
+      ).toEqual(base.map((p) => p.slice(0, 7)));
+    }
+    // gezeichnet wird der Umriss der Grundform: bei der Biene ohne ihre feinen Beine unter dem Leib
+    const P = projection(0, 0, 400, 300, 1);
+    const gold = (rows: string[]) => rows.join('').split('o').length - 1;
+    const r = recorder();
+    vi.stubGlobal('document', { querySelector: () => null });
+    showHint({ score: () => {} }, 'biene', 0)(r.ctx, worldOf(1), P, 400);
+    vi.unstubAllGlobals();
+    expect(r.rects).toHaveLength(2 * gold(silhouette(shapeOf('biene'))));
+    expect(gold(silhouette(shapeOf('biene')))).not.toBe(gold(silhouette(SPECIES.biene.parts)));
+  });
+
   it('der Hase hat Ohren: oben ragen zwei schmale Spitzen über den Kopf', () => {
-    const rows = silhouette(SPECIES.hase.parts);
+    const rows = silhouette(shapeOf('hase'));
     const top = rows[0]!;
     expect(top.replace(/\./g, '').length).toBeLessThanOrEqual(4);
     expect(rows.at(-1)!.replace(/\./g, '').length).toBeGreaterThan(top.replace(/\./g, '').length);
@@ -102,7 +124,7 @@ describe('„Noch nicht“: Umriss dessen, was fehlt', () => {
     const door = world.gates.get('eis')!;
     const [mx, my] = door.mid;
     const P = projection(mx + 0.5, my + 0.5, 400, 300, 1);
-    const rows = silhouette(SPECIES.igel.parts);
+    const rows = silhouette(shapeOf('igel'));
     const gold = rows
       .join('')
       .split('')

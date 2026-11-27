@@ -20,6 +20,7 @@ import type { View3D } from '../../mitwachsen-view-3d';
 import { buildKessel, placeKessel } from './mitwachsen-kessel';
 import { view } from './view-2d';
 import { ICE_MODELS } from '../../../../data/games/worlds/eis/mitwachsen-ice-models';
+import { ICE_FINE_MODELS } from '../../../../data/games/worlds/eis/mitwachsen-ice-fine';
 import { guide, hold, meetGuide } from './mitwachsen-lead';
 import { shut } from './mitwachsen-ritual';
 import { rules as snowman } from './mitwachsen-snowman';
@@ -52,5 +53,6 @@ export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules
   sights: [...SIGHTS, haltSight(sled), haltSight(tube), haltSight(cat), ...PLACE_SIGHTS],
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
-  models: ICE_MODELS,
+  models: ICE_FINE_MODELS, // fein (Muster, Zehen, Krallen …); der Umriss von „Noch nicht“ bleibt die Grundform
+  outlines: ICE_MODELS,
 };

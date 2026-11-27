@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Point } from '../../../../data/games/mitwachsen';
 import { CAVE_SPECIES } from '../../../../data/games/mitwachsen-hoehle';
 import { DIRS, type Dir, type Projection } from '../../../../lib/games/front';
@@ -10,6 +10,7 @@ import type { SkyScene } from '../../mitwachsen-sky';
 import { awayIn, packScore } from '../../mitwachsen-view';
 import { kesselPlace, type World } from '../../mitwachsen-world';
 import { EIS_PACK, HOEHLE_PACK, PACKS, worldOf } from '../../test-worlds';
+import { anyContext, fakeDocument } from '../../test-canvas';
 import { roostAt } from '../../mitwachsen-roost';
 import { columnBoxes } from './mitwachsen-cave-look';
 import { PERCH_REACH, sleeperNear } from './mitwachsen-cave-rules';
@@ -198,10 +199,11 @@ describe('Säulen-Glockenspiel (Kristallgrotte): Bild und Klang', () => {
     const { p, c } = cellsOf(1).find((e) => e.c.deco === 'column')!;
     const still = columnBoxes(c, ...p);
     const lit = columnBoxes(c, ...p, 1);
-    expect(lit[0]).toEqual(still[0]);
-    expect(lit[1]![6]).not.toBe(still[1]![6]);
+    expect(lit.slice(0, 2)).toEqual(still.slice(0, 2)); // Sockel und Platte
+    const body = (boxes: ReturnType<typeof columnBoxes>) => boxes.find((b) => b[9]?.halo)!; // die Säule: das erste Teil, das leuchtet
+    expect(body(lit)[6]).not.toBe(body(still)[6]);
     const bright = (hex: string) => [1, 3, 5].reduce((a, i) => a + parseInt(hex.slice(i, i + 2), 16), 0);
-    expect(bright(lit[1]![6])).toBeGreaterThan(bright(still[1]![6]));
+    expect(bright(body(lit)[6])).toBeGreaterThan(bright(body(still)[6]));
     // über das Paket: sein Ton, ab dann leuchtet die Säule in 2D; in 3D steht sie still (dort leuchtet die Ebene darüber)
     const notes = view.score!({ type: 'column', x: p[0], y: p[1], note: c.note! })!;
     expect(notes[0]![0]).toBe(COLUMN_SCALE[c.note!]);
@@ -448,12 +450,15 @@ describe('Tropfsteine (Kristallgrotte)', () => {
 });
 
 describe('Luft der Grotte (2D und Ebene über 3D)', () => {
-  /** Zeichenfläche, die nur zählt, wie oft gemalt wird */
+  /** Zeichenfläche, die nur zählt, wie oft gemalt wird (Flächen und Bilder: Modelle kommen fein aus dem Bild-Cache) */
   const canvas = () => {
     let n = 0;
-    const ctx = { globalAlpha: 1, fillStyle: '', fillRect: () => void n++ } as unknown as CanvasRenderingContext2D;
+    const ctx = anyContext(() => void n++);
     return { ctx, painted: () => n };
   };
+  let restore = () => {};
+  beforeAll(() => void (restore = fakeDocument()));
+  afterAll(() => restore());
   const P: Projection = (x, y, z) => [x * 10, (y - z) * 10];
   const scene = (now: number, reduced: boolean, lit3d = false) =>
     ({ now, reduced, lit3d, explored: () => true, zoom: 1 }) as unknown as SkyScene;

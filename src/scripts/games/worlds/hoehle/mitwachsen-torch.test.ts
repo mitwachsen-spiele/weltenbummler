@@ -72,7 +72,7 @@ describe('Kristallfackeln: in der Welt', () => {
     const w = worldOf(SAMPLE_SEEDS[0]!, [HOEHLE_PACK]);
     const [x, y] = torchesOf(w)[0]!;
     const boxes = caveBoxes(w, w.cell(x, y), x, y)!;
-    expect(boxes.length).toBe(4);
+    expect(boxes.length).toBe(9); // Pfosten in drei Stücken mit zwei Ringen dazwischen, drei Stufen Flamme, Lichtkante
     for (const [bx, by, , bw, bd] of boxes) {
       expect(bx).toBeGreaterThanOrEqual(x);
       expect(bx + bw).toBeLessThanOrEqual(x + 1);

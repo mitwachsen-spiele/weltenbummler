@@ -92,9 +92,9 @@ export function tubeBodies(state: State, world: World, at: RideAt): readonly Rid
   ];
 }
 
-/** Stufe der Treppe (`'hillstep'`): ein Brett aus Holz quer über dem Feld, zwei Fugen */
+/** Stufe der Treppe (`'hillstep'`): ein Brett aus Holz (Maserung) quer über dem Feld, zwei Fugen */
 export const stepBoxes = (c: Cell, x: number, y: number): Box[] => [
-  [x + 0.05, y + 0.06, c.h, 0.9, 0.88, 0.05, ...TUBE_COLORS.step],
+  [x + 0.05, y + 0.06, c.h, 0.9, 0.88, 0.05, ...TUBE_COLORS.step, undefined, { skin: 'holz' }],
   [x + 0.34, y + 0.06, c.h + 0.05, 0.03, 0.88, 0.006, TUBE_COLORS.seam, TUBE_COLORS.seam],
   [x + 0.64, y + 0.06, c.h + 0.05, 0.03, 0.88, 0.006, TUBE_COLORS.seam, TUBE_COLORS.seam],
 ];

@@ -3,7 +3,8 @@
 // Kristall-Lampen und dem Schild „Fledermaus auf Lila“ über den letzten beiden Reihen am fernen Ende (weg von der
 // Sitzreihe, dort steigt die Figur aus, `batRoof` in mitwachsen-platform.ts). Kein Bau daneben (der Lokschuppen ist seit Issue 25 weg). Er steht, sobald die Welt mit Ausbau 2 gebaut ist (Bau 2: zum Augenblick `pop` wird sie neu gebaut, der
 // Bahnsteig liegt dann eine Stufe über dem Gleis); vorher nichts. Wo alles steht,
-// rechnet `batOf` je Welt einmal aus den Feldern. Teil des Pakets der Bahn (mitwachsen-station-look.ts).
+// rechnet `batOf` je Welt einmal aus den Feldern. Keiner der Körper wirft einen weichen Fleck (`foot` 0): Reihen liegen
+// flach, Dach und Schild schweben bzw. stehen auf dem Dach, die Pfosten stehen hinten. Teil des Pakets der Bahn (mitwachsen-station-look.ts).
 // Spezifikation: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 2)
 
 import { dirTo } from '../../mitwachsen-free';
@@ -34,7 +35,7 @@ export function batBodies(world: World, state: Standing): RideBody[] {
   const out: RideBody[] = st.rows.map(({ edge, back }, i) => {
     const k = `bahn:fels:${i % 2}`;
     const [x, y, z] = [(edge[0] + back[0]) / 2, (edge[1] + back[1]) / 2, world.cell(...edge).h];
-    return { id: `bahn:fels:${i}`, key: k, x, y, z, dir, parts: model(k, () => batRowParts(i % 2 === 1)) };
+    return { id: `bahn:fels:${i}`, key: k, x, y, z, dir, parts: model(k, () => batRowParts(i % 2 === 1)), foot: 0 };
   });
   const under = st.roof.flatMap((i) => (st.rows[i] ? [st.rows[i].edge, st.rows[i].back] : []));
   if (under.length === 4) {
@@ -50,9 +51,10 @@ export function batBodies(world: World, state: Standing): RideBody[] {
         z,
         dir,
         parts: BAT_ROOF,
+        foot: 0,
         ...(underRoof(st, state) ? { sheer: true } : {}),
       },
-      { id: 'bahn:felspfosten', key: 'bahn:felspfosten', x, y, z, dir, parts: BAT_POSTS },
+      { id: 'bahn:felspfosten', key: 'bahn:felspfosten', x, y, z, dir, parts: BAT_POSTS, foot: 0 },
       {
         id: 'bahn:felsschild',
         key: 'bahn:felsschild',
@@ -60,6 +62,7 @@ export function batBodies(world: World, state: Standing): RideBody[] {
         z: z + ROOF_TOP,
         dir: 's',
         parts: BAT_SIGN,
+        foot: 0,
       },
     );
   }

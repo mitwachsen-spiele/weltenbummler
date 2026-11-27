@@ -9,7 +9,10 @@ import {
   box,
   drawModel,
   frontBlock,
+  paintWith,
   projection,
+  type Dir,
+  type Part,
   type Projection,
 } from '../../lib/games/front';
 import {
@@ -41,15 +44,37 @@ import {
 } from '../../data/games/mitwachsen';
 import { carried } from './mitwachsen-carry';
 import { grown } from './mitwachsen-growth';
-import { drawBox, drawDeco, placeRails, type Box, type DecoAt, type View2D } from './mitwachsen-view';
-import { drawStone, heardStone } from './mitwachsen-story';
+import {
+  drawBox,
+  drawDeco,
+  drawMark,
+  placeRails,
+  type Box,
+  type DecoAt,
+  type RailFoot,
+  type View2D,
+} from './mitwachsen-view';
+import { decoBoxes } from './mitwachsen-deco-look';
+import {
+  SIGN_TOP,
+  WOOD_BED,
+  bedBoxes,
+  bridgeBoxes,
+  fenceBoxes,
+  signBoxes,
+  signWidth,
+  sleeperBoxes,
+} from './mitwachsen-yard-look';
+import { clampRow, rowCache, sortBoxes } from './mitwachsen-row';
+import { heardStone, noteFloat } from './mitwachsen-story';
+import { STONE_FOOT, drawStone } from './mitwachsen-stone-look';
 import type { WeatherLook } from './mitwachsen-weather';
 import type { Pose } from './mitwachsen-tired';
 import type { Climate } from './mitwachsen-world';
 import type { State } from './mitwachsen-state';
 import { cycle, hash } from '../../lib/games/rng';
-import type { Cell, TreeKind, World } from './mitwachsen-world';
-import { PILZ_OVER, ROOF_LEFT, homeAt, openRoof } from './mitwachsen-home';
+import type { Cell, Deco, World } from './mitwachsen-world';
+import { ROOF_LEFT, homeAt, openRoof } from './mitwachsen-home';
 import { drawPlate, drawPlatform } from './mitwachsen-platform-2d';
 import { stoneOf } from './mitwachsen-waystone';
 import { waystoneBoxes } from './mitwachsen-waystone-look';
@@ -63,11 +88,22 @@ import { moodLife } from './mitwachsen-sky';
 import { turnHead } from './mitwachsen-air';
 import { Album } from './mitwachsen-album';
 import { ASK, BIRD, BIRD_EYE, HEART, NOTE, ZZZ, sprite, type Particle } from './mitwachsen-glyphs';
-import { byRow, drawRide, type RideBody } from './mitwachsen-ride-view';
+import { byRow, drawRide, footOf, type RideBody } from './mitwachsen-ride-view';
 import { hangAt, labelHeight } from './mitwachsen-roost';
 import { isRing } from './mitwachsen-rim';
 import { PAL_RING, rimBlossoms } from './mitwachsen-rim-look';
 import { workOf } from './mitwachsen-herald';
+import {
+  Fine2D,
+  FootSpots,
+  Sprites,
+  boxesExtent,
+  contactShadow,
+  edgeShade,
+  glowHalo,
+  modelExtent,
+} from './mitwachsen-fine-2d';
+import { HaloPass, type HaloLit, type HaloView } from './mitwachsen-halo';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
 export type Body = { x: number; y: number; z: number; hop: number; puff?: number }; // puff: Haltung im Iglu (Größe)
@@ -111,8 +147,39 @@ export type Scene = {
   rides: readonly RideBody[]; // Fahrzeug aus einem Welt-Paket (Schlitten, Zugtier, Laternenpfahl; die Figur sitzt darin)
 };
 
-/** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee: `BED_SNOW`) */
-const BED_FRAME: readonly [string, string] = [GAME_COLORS.bed.frame, GAME_COLORS.bed.frame];
+/**
+ * Weicher Fleck unter Dingen in 2D (in 3D macht das die Sonne): Mitte (Felder nach vorn) und Halbbreite des Fußes (oder
+ * quer und tief). Die Dinge der Welt-Pakete melden ihren selbst (`View2D.foot`)
+ */
+const SHADOW: Partial<Record<Deco, readonly [number, number | readonly [number, number]]>> = {
+  tree: [0.55, 0.45],
+  bush: [0.55, 0.36],
+  boulder: [0.55, 0.32],
+  bed: [0.52, [0.46, 0.44]],
+  cactus: [0.5, 0.26],
+  trough: [0.51, [0.46, 0.38]],
+  watertrough: [0.51, [0.46, 0.38]],
+  bigshroom: [0.5, 0.3],
+  shelterpilz: [0.5, 0.42],
+  sign: [0.5, 0.14], // Pfosten der Tafel
+};
+/** Anstieg des Blicks je Feld nach vorn in 2D (für die Verdeckung der Leuchten): Tiefe einer Reihe in Ebenen */
+const RISE_2D = TILE_D / LEVEL_H;
+
+/** Dunst am Rand des Erkundeten auf Feld (x, y): je mehr Nebel ringsum (5 × 5), desto dichter (0 … 0,85) */
+function hazeAt(sc: Pick<Scene, 'explored'>, x: number, y: number): number {
+  let fog = 0;
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (!sc.explored(x + dx, y + dy)) fog++;
+  return Math.min(0.85, fog / 14);
+}
+/** Kennungen der festen Teilelisten (Tiere, Haltungen) für den Bild-Cache; die Figur wird nach ihrem Inhalt erkannt */
+const PART_IDS = new WeakMap<readonly Part[], string>();
+let partCount = 0;
+const partsId = (parts: readonly Part[]) => {
+  let id = PART_IDS.get(parts);
+  if (!id) PART_IDS.set(parts, (id = `m${partCount++}`));
+  return id;
+};
 
 /**
  * Die Figur, mit Korb auf dem Rücken, Eimer (in der Grotte Kanne) und Netz in den Händen, solange sie Beeren oder Pilze,
@@ -130,6 +197,10 @@ const facing = (state: State, sc: Scene) => (sc.pose === 'stand' ? state.player.
 const PAL_SAND: Palette = { D: [['#e3cf95', 1]], d: [['#d4bd7d', 1]], e: [['#efdeaa', 1]] };
 const PAL_PATH: Palette = { D: [['#c9a46e', 1]], d: [['#b48d58', 1]], e: [['#d8b783', 1]] };
 
+/** Höhe der Oberseite eines Felds für den weichen Schatten am Boden; null, wo kein Boden ist (Wasser, Lava, Himmel) */
+const heightOrNull = (c: Cell): number | null =>
+  c.ground === 'water' || c.ground === 'lava' || c.ground === 'sky' ? null : c.h;
+
 export class Renderer {
   /** Quader der Welt-Pakete im Bild (Iglu, Eisschale, Trog, Kristallwand): jeder kommt in der Reihe seiner Vorderkante dran */
   private later: Box[] = [];
@@ -138,6 +209,11 @@ export class Renderer {
   private at: DecoAt = { now: 0, reduced: false, picked: {}, packs: {} };
   private album = new Album(); // Leiste unten
   private roof = 1; // Deckkraft der Dächer am Zuhause in diesem Bild (`openRoof`)
+  private things = rowCache(); // Quader der Dinge je Feld, geklemmt und sortiert (nicht jedes Bild neu)
+  private fine = new Fine2D(); // Muster und Verlauf der Dinge, sammelt das Leuchten
+  private sprites = new Sprites(); // Dinge und Modelle als Bild je Maßstab (mitwachsen-fine-2d.ts)
+  private spots = new FootSpots(); // Flecken über mehrere Reihen (Iglu)
+  private halos = new HaloPass(); // Leuchten über allem (mitwachsen-halo.ts)
   private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Torplatte; nachgeladen)
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'ring' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
 
@@ -184,17 +260,22 @@ export class Renderer {
 
     this.later = [];
     this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked, packs: state.packs, work: workOf(state) };
+    paintWith(ctx, this.fine); // Dinge fein; Gelände, Böden und Torhäuser zeichnen ausdrücklich flach
+    this.sprites.begin(ctx, world);
+    this.spots.begin();
     this.roof = 1 - (1 - ROOF_LEFT) * openRoof(world, state.player.x, state.player.y).open;
     this.guest = this.guestAt(world, state);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
-      for (const b of marks.get(y) ?? []) if (sc.explored(Math.floor(b[0]), y)) drawBox(ctx, P, b);
+      for (const b of marks.get(y) ?? []) if (sc.explored(Math.floor(b[0]), y)) drawMark(ctx, P, b); // weicher Rand
       for (const v of this.views.values()) v.trail?.draw(ctx, world, P, y); // Fußspuren im Schnee (aus dem Welt-Paket)
+      this.spots.row(ctx, P, y);
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
       for (const b of this.later)
         if (Math.ceil(b[1] + b[4] - 1e-6) - 1 === y) {
           ctx.globalAlpha = b[8] === 'see' ? this.roof : 1; // Dach am Zuhause durchscheinend (`openRoof`)
-          drawBox(ctx, P, b);
+          drawBox(ctx, P, b, b[8] === 'sway' || b[8] === 'glow' ? null : undefined); // Leuchtschrift, Lichtpunkte: scharf
+          if (b[8] === 'glow') glowHalo(this.fine, b); // scharf, leuchtet aber weich in den Raum wie in 3D
           ctx.globalAlpha = 1;
         }
       for (const r of rides.get(y) ?? []) this.ride(P, sc, r);
@@ -202,8 +283,9 @@ export class Renderer {
       for (const id of ids) {
         const b = sc.bodies.get(id)!;
         if (id === 'player') {
-          this.shadow(P, b.x + 0.5, b.y + 0.5, b.z, 0.32);
-          drawModel(ctx, P, figure(state, sc, world), b.x + 0.5, b.y + 0.5, b.z + b.hop, facing(state, sc), 1);
+          contactShadow(ctx, P, b.x + 0.5, b.y + 0.5, b.z, 0.3, b.hop, sc.reduced);
+          const me = figure(state, sc, world);
+          this.model(P, me, JSON.stringify(me), b, facing(state, sc), 1);
           continue;
         }
         const a = byId.get(id);
@@ -212,10 +294,9 @@ export class Renderer {
         const scale = sp.scale * (b.puff ?? 1);
         const perch = hangAt(a, world.cell(a.x, a.y)); // hängt kopfüber an seinem Sitzplatz (Fledermaus im Bogen)
         if (perch !== undefined && sc.away(a.x, a.y)) continue; // gerade auf ihrer Runde (Bild des Welt-Pakets)
-        this.shadow(P, b.x + 0.5, b.y + 0.5, b.z, 0.26 * scale);
-        if (perch !== undefined && sp.roost)
-          drawModel(ctx, P, sp.roost, b.x + 0.5, b.y + 0.5, b.z + perch, a.dir, scale);
-        else drawModel(ctx, P, (a.solo && sp.solo) || sp.parts, b.x + 0.5, b.y + 0.5, b.z + b.hop, a.dir, scale);
+        contactShadow(ctx, P, b.x + 0.5, b.y + 0.5, b.z, 0.24 * scale, perch === undefined ? b.hop : 0, sc.reduced);
+        const parts = perch !== undefined && sp.roost ? sp.roost : (a.solo && sp.solo) || sp.parts;
+        this.model(P, parts, partsId(parts), perch !== undefined && sp.roost ? { ...b, hop: perch } : b, a.dir, scale);
       }
     }
 
@@ -223,18 +304,44 @@ export class Renderer {
     const me = sc.bodies.get('player');
     if (me && !state.sleeping && !state.ride) {
       ctx.globalAlpha = 0.35;
-      drawModel(ctx, P, figure(state, sc, world), me.x + 0.5, me.y + 0.5, me.z + me.hop, facing(state, sc), 1);
+      const parts = figure(state, sc, world);
+      this.model(P, parts, JSON.stringify(parts), me, facing(state, sc), 1, false); // ihre Leuchten zählen schon
       ctx.globalAlpha = 1;
     }
+    paintWith(ctx, null);
 
     this.atmosphere(sc);
-    this.overlay(world, state, sc, P);
+    this.overlay(world, state, sc, P, this.fine.take());
+  }
+
+  /** Ein Modell (Figur, Tier) aus dem Bild-Cache: je Teile, Richtung und Größe einmal fein gezeichnet */
+  private model(P: Projection, parts: readonly Part[], id: string, b: Body, dir: Dir, scale: number, glow = true) {
+    const key = `${id}|${dir}|${scale.toFixed(3)}`;
+    const at = [b.x + 0.5, b.y + 0.5, b.z + b.hop] as const;
+    this.sprites.draw(
+      this.ctx,
+      P,
+      key,
+      at,
+      modelExtent(parts, scale),
+      (c, Q) => {
+        drawModel(c, Q, parts, at[0], at[1], at[2], dir, scale);
+      },
+      glow ? this.fine : null,
+    );
+  }
+
+  /** Etwas, das Block bleibt (Torhaus, Portal, Torplatte), ohne den Maler der Dinge zeichnen */
+  private flat(draw: () => void) {
+    paintWith(this.ctx, null);
+    draw();
+    paintWith(this.ctx, this.fine);
   }
 
   /** Ein Körper eines Fahrzeugs (im Nebel verborgen wie die Tiere) */
   private ride(P: Projection, sc: Scene, r: RideBody) {
     if (!sc.explored(Math.round(r.x), Math.round(r.y))) return;
-    this.shadow(P, r.x + 0.5, r.y + 0.5, r.z, 0.3);
+    if (footOf(r) > 0) contactShadow(this.ctx, P, r.x + 0.5, r.y + 0.5, r.z, footOf(r), 0, sc.reduced);
     drawRide(this.ctx, P, r);
   }
 
@@ -243,7 +350,7 @@ export class Renderer {
    * Luft und die Leiste. Gleich für beide Ansichten; die 3D-Ansicht reicht ihre eigene Projektion herein und zeichnet
    * diese Ebene auf ein durchsichtiges Canvas über der 3D-Welt.
    */
-  overlay(world: World, state: State, sc: Scene, P: Projection) {
+  overlay(world: World, state: State, sc: Scene, P: Projection, halos: readonly HaloLit[] = [], view?: HaloView) {
     const { ctx } = this;
     const z = sc.zoom;
     const followers = new Set(state.followers);
@@ -283,6 +390,16 @@ export class Renderer {
     moodLife(ctx, sc);
     if (sc.night > 0) this.nightSky(sc);
     if (sc.aurora > 0) ice?.aurora(ctx, sc, P);
+    // Leuchten kompakter Teile: nach Maske und Nacht, nur Erkundetes, gedämpft hinter Hügeln und Kronen
+    const me = sc.bodies.get('player');
+    const focus = [(me?.x ?? sc.cam.x) + 0.5, (me?.y ?? sc.cam.y) + 0.5] as const;
+    this.halos.draw(ctx, P, halos, {
+      explored: sc.explored,
+      night: sc.night,
+      focus,
+      cell: world.cell.bind(world),
+      view: view ?? { rise: RISE_2D, to: [0, 1], seen: (x, y) => 1 - hazeAt(sc, x, y) }, // 2D: von vorn, Dunst wie `haze`
+    });
     this.life(sc);
     this.album.draw(ctx, state, sc, world.realm(state.player.x, state.player.y), ice);
   }
@@ -338,14 +455,16 @@ export class Renderer {
     if (!sc.explored(x, y)) return; // im Nebel: nichts, der Himmel scheint durch
     if (c.ground === 'water') return this.water(P, world, x, y, sc);
     if (c.ground === 'sky') return; // zwischen den Wolken: nur Himmel
-    if (c.ground === 'lava') return box(this.ctx, P, x, y, 0, 1, 1, 0.6, '#b8380a', '#ff7a1a');
+    if (c.ground === 'lava') return box(this.ctx, P, x, y, 0, 1, 1, 0.6, '#b8380a', '#ff7a1a', undefined, null);
     const flat = flatColors(c);
     if (flat) {
       // Böden der Welten hinter den Toren: einfache Blöcke in ihren Farben
       const frontH = world.cell(x, y + 1).h;
-      for (let k = Math.max(0, Math.min(c.h - 1, frontH)); k < c.h; k++) box(this.ctx, P, x, y, k, 1, 1, 1, ...flat);
+      for (let k = Math.max(0, Math.min(c.h - 1, frontH)); k < c.h; k++)
+        box(this.ctx, P, x, y, k, 1, 1, 1, ...flat, undefined, null);
       // Rutschspur zum Schneebett (aus dem Welt-Paket): flach im Boden, unter Kanten und Nebelrand
-      if (c.biome) drawBox(this.ctx, P, this.views.get(c.biome)?.ground(c, x, y, sc.gates.has(c.biome), sc.evening));
+      if (c.biome)
+        drawBox(this.ctx, P, this.views.get(c.biome)?.ground(c, x, y, sc.gates.has(c.biome), sc.evening), null);
       this.edges(P, world, x, y, c.h);
       this.plate(P, world, c, x, y, sc);
       return this.haze(P, x, y, c.h, sc);
@@ -371,7 +490,7 @@ export class Renderer {
     this.edges(P, world, x, y, c.h);
     if (c.rim)
       for (const [bx, by, bz, w, d, bh, color] of rimBlossoms(x, y, c.h))
-        box(this.ctx, P, bx, by, bz, w, d, bh, color, color);
+        box(this.ctx, P, bx, by, bz, w, d, bh, color, color, undefined, null);
     if (c.tint && c.ground === 'grass') {
       // Stimmung der Richtung: Gras tönen (multiplizieren, damit die Körnung bleibt)
       const [ax, ay] = P(x, y, c.h);
@@ -397,12 +516,12 @@ export class Renderer {
   /** Wegstein und Torplatte auf dem Feld (nach dem Boden, vor dem Nebelrand: Sinkt sie ein, verdeckt das Feld davor ihre Vorderkante) */
   private plate(P: Projection, world: World, c: Cell, x: number, y: number, sc: Scene) {
     const way = stoneOf(c); // Wegstein neben einem Weltpfad: wach, sobald sein Tor offen ist
-    if (way) for (const b of waystoneBoxes(x, y, c.h, way, sc.gates.has(way))) box(this.ctx, P, ...b);
+    if (way) for (const b of waystoneBoxes(x, y, c.h, way, sc.gates.has(way))) drawBox(this.ctx, P, b);
     if (c.plate) {
       const look = this.views.get(c.plate)?.plate; // Schmuck aus dem Paket der Welt dahinter (Eis-Welt: Scholle)
       // goldener Rand, solange der Pinguin zu diesem Tor führt (aus dem Paket)
       const gold = this.guest?.rim(c.plate, sc.now, sc.reduced);
-      drawPlate(this.ctx, P, world, c.plate, x, y, c.h, sc.plate, sc.now, sc.reduced, look, gold);
+      this.flat(() => drawPlate(this.ctx, P, world, c.plate!, x, y, c.h, sc.plate, sc.now, sc.reduced, look, gold));
     }
   }
 
@@ -437,6 +556,8 @@ export class Renderer {
         rect(line);
       }
     }
+    // weicher Schatten neben höheren Blöcken (Entwurf „Feine Grafik“), zusätzlich zu den Kanten
+    edgeShade(ctx, P, (nx, ny) => heightOrNull(world.cell(nx, ny)), x, y);
     if (height(x, y + 1) < h) {
       ctx.fillStyle = GAME_COLORS.highlight;
       ctx.fillRect(ax, by - line, w, line);
@@ -477,17 +598,6 @@ export class Renderer {
     }
   }
 
-  /** Weicher Schatten auf dem Boden unter einem Wesen oder Gegenstand */
-  private shadow(P: Projection, cx: number, cy: number, z: number, r: number) {
-    const [sx, sy] = P(cx, cy, z);
-    const [ex] = P(cx + r, cy, z);
-    const rx = ex - sx;
-    this.ctx.fillStyle = 'rgba(20,30,20,.22)';
-    this.ctx.beginPath();
-    this.ctx.ellipse(sx, sy, rx, rx * 0.42, 0, 0, Math.PI * 2);
-    this.ctx.fill();
-  }
-
   /** Grasbüschel: je drei schmale Halme in verschiedenen Grüntönen */
   private tufts(P: Projection, x: number, y: number, h: number, n: number) {
     const greens = ['#3a7f2c', '#4f9a3c', '#6dbd47', '#2f6f28'];
@@ -497,94 +607,10 @@ export class Renderer {
         ty = y + 0.15 + ((r >>> 8) % 65) / 100;
       for (let b = 0; b < 3; b++) {
         const bh = 0.2 + ((r >>> (12 + b * 3)) % 7) / 36;
-        box(this.ctx, P, tx + b * 0.055, ty + (b === 1 ? -0.02 : 0), h, 0.045, 0.02, bh, cycle(greens, r + b));
+        const g = cycle(greens, r + b);
+        box(this.ctx, P, tx + b * 0.055, ty + (b === 1 ? -0.02 : 0), h, 0.045, 0.02, bh, g, undefined, undefined, null);
       }
     }
-  }
-
-  /** Blätterklumpen mit Sprenkeln in hell und dunkel, damit er nicht flach wirkt */
-  private leafy(
-    P: Projection,
-    x0: number,
-    y0: number,
-    z0: number,
-    w: number,
-    d: number,
-    hgt: number,
-    color: string,
-    top: string,
-    sx: number,
-    sy: number,
-  ) {
-    const { ctx } = this;
-    box(ctx, P, x0, y0, z0, w, d, hgt, color, top);
-    for (let i = 0; i < 16; i++) {
-      const r = hash(11, sx, sy, i);
-      const fx = x0 + ((r % 85) / 100) * w,
-        fz = z0 + (((r >>> 8) % 80) / 100) * hgt;
-      const [px, py] = P(fx, y0 + d, fz);
-      const s = Math.max(2, P(fx + 0.07, y0, 0)[0] - P(fx, y0, 0)[0]);
-      ctx.fillStyle = i % 3 === 0 ? 'rgba(255,255,255,.28)' : 'rgba(0,40,0,.32)';
-      ctx.fillRect(px, py - s, s, s);
-      const [qx, qy] = P(x0 + (((r >>> 16) % 85) / 100) * w, y0 + (((r >>> 4) % 80) / 100) * d, z0 + hgt);
-      ctx.fillStyle = i % 2 ? 'rgba(255,255,255,.2)' : 'rgba(0,40,0,.18)';
-      ctx.fillRect(qx, qy, s, s * 0.7);
-    }
-  }
-
-  /** Baum mit großer, runder Krone aus mehreren Klumpen; vier Arten mit eigenen Farben */
-  private tree(P: Projection, x: number, y: number, h: number, kind: TreeKind) {
-    const { ctx } = this;
-    const leaves: Record<TreeKind, [string, string]> = {
-      oak: ['#3f9a3c', '#5ab651'],
-      birch: ['#6aab3a', '#8fcf5a'],
-      autumn: ['#d9732e', '#f0a04a'],
-      red: ['#b8452e', '#d9603a'],
-      blossom: ['#e595bd', '#f6c3dc'],
-      winter: ['#cfdbe2', '#ffffff'],
-      pine: ['#2f6f3a', '#3f8a48'],
-      snowpine: ['#2f6f3a', '#ffffff'],
-      palm: ['#3f9a3c', '#5ab651'],
-      dead: ['#4a3426', '#5d3e21'],
-    };
-    const [leaf, top] = leaves[kind];
-    this.shadow(P, x + 0.5, y + 0.6, h, 0.7);
-    if (kind === 'pine' || kind === 'snowpine') {
-      box(ctx, P, x + 0.4, y + 0.42, h, 0.2, 0.2, 0.7, '#7a5432', '#93683f');
-      box(ctx, P, x - 0.25, y - 0.1, h + 0.5, 1.5, 1.2, 0.6, leaf, top);
-      box(ctx, P, x, y + 0.1, h + 1.2, 1.0, 0.8, 0.6, leaf, top);
-      box(ctx, P, x + 0.2, y + 0.25, h + 1.8, 0.6, 0.5, 0.6, leaf, top);
-      return;
-    }
-    if (kind === 'palm') {
-      box(ctx, P, x + 0.4, y + 0.42, h, 0.22, 0.2, 2.1, '#a77c46', '#c9a066');
-      box(ctx, P, x - 0.6, y + 0.3, h + 2.1, 2.4, 0.4, 0.14, leaf, top);
-      box(ctx, P, x + 0.35, y - 0.6, h + 2.1, 0.32, 2.2, 0.14, leaf, top);
-      return;
-    }
-    if (kind === 'dead') {
-      box(ctx, P, x + 0.4, y + 0.42, h, 0.2, 0.2, 1.5, leaf, top);
-      box(ctx, P, x + 0.15, y + 0.45, h + 0.9, 0.3, 0.1, 0.1, leaf);
-      return;
-    }
-    if (kind === 'birch') {
-      box(ctx, P, x + 0.4, y + 0.42, h, 0.2, 0.2, 1.5, '#e8e4d8', '#f3efe6');
-      for (const z of [0.3, 0.75, 1.15]) box(ctx, P, x + 0.4, y + 0.6, h + z, 0.12, 0.02, 0.06, '#3a3a44');
-      this.leafy(P, x + 0.05, y + 0.12, h + 1.3, 0.9, 0.8, 0.9, leaf, top, x, y);
-      this.leafy(P, x + 0.2, y + 0.25, h + 2.2, 0.6, 0.5, 0.45, leaf, top, x + 1, y);
-      return;
-    }
-    box(ctx, P, x + 0.36, y + 0.38, h, 0.28, 0.28, 1.2, '#7a5432', '#93683f');
-    // Runde, buschige Krone: Mitte am breitesten, darüber kleinere Klumpen leicht versetzt
-    this.leafy(P, x - 0.1, y + 0.1, h + 1.05, 1.2, 0.85, 0.55, leaf, top, x, y);
-    this.leafy(P, x - 0.38, y + 0.02, h + 1.45, 1.76, 1.0, 0.75, leaf, top, x + 1, y);
-    this.leafy(P, x - 0.2, y + 0.12, h + 2.2, 0.85, 0.75, 0.5, leaf, top, x + 2, y);
-    this.leafy(P, x + 0.45, y + 0.2, h + 2.1, 0.6, 0.6, 0.45, leaf, top, x + 3, y);
-    if (kind === 'blossom')
-      for (let i = 0; i < 6; i++) {
-        const r = hash(17, x, y, i);
-        box(ctx, P, x - 0.15 + (r % 120) / 100, y + 1, h + 1.15 + ((r >>> 8) % 70) / 100, 0.08, 0.02, 0.08, '#ffffff');
-      }
   }
 
   /** Warmes Licht von oben links, Dunst in der Ferne (oben im Bild) und dunklere Ränder */
@@ -660,13 +686,12 @@ export class Renderer {
 
   /** Weicher Dunst am Rand des Erkundeten: je mehr Nebel ringsum, desto heller */
   private haze(P: Projection, x: number, y: number, h: number, sc: Scene) {
-    let fog = 0;
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (!sc.explored(x + dx, y + dy)) fog++;
-    if (!fog) return;
+    const veil = hazeAt(sc, x, y);
+    if (!veil) return;
     const [ax, ay] = P(x, y, h);
     const [bx, by] = P(x + 1, y + 1, h);
     const [, cy] = P(x, y + 1, Math.max(0, h - 2));
-    this.ctx.fillStyle = `rgba(214,234,246,${Math.min(0.85, fog / 14).toFixed(2)})`;
+    this.ctx.fillStyle = `rgba(214,234,246,${veil.toFixed(2)})`;
     this.ctx.fillRect(ax, ay, bx - ax, Math.max(by, cy) - ay);
   }
 
@@ -675,222 +700,84 @@ export class Renderer {
     const c = grown(world.seed, state.day, x, y, world.cell(x, y)); // mit allem, was schon nachgewachsen ist
     const { ctx } = this;
     // Gleis (Paket der Bahn) statt Büscheln, Blumen und Deko; unter der Tür des Höhlentors die Tür darüber (`placeRails`)
-    if (!placeRails(ctx, P, c, () => this.first((v) => v.rails?.(c, x, y, this.at)), this.later)) return;
+    const rails = () => this.first((v) => v.rails?.(c, x, y, this.at));
+    const foot = ([fx, fy, fz, f]: RailFoot) => contactShadow(ctx, P, fx, fy, fz, f);
+    if (!placeRails(ctx, P, c, rails, this.later, foot)) return;
     const h = c.h;
     if (c.tufts) this.tufts(P, x, y, h, c.tufts);
     // Dinge einer Welt (Iglu, Eisschale, Wassertrog, Fischkiste, Kristallwand) zeichnet ihr Welt-Paket; solange es lädt,
     // ein Block
     const ice = c.biome ? drawDeco(this.views.get(c.biome) ?? null, world, c, x, y, this.at) : null;
     // gezeichnet erst in der Reihe ihrer Vorderkante: sonst deckte der Boden der Reihen davor die Kuppel unten zu
-    if (ice) return void this.later.push(...ice);
+    if (ice) {
+      const spot = this.views.get(c.biome!)?.foot?.(world, c, x, y);
+      if (spot) this.spots.place(ctx, P, spot, y); // weicher Fleck darunter
+      return void this.later.push(...ice);
+    }
+    const under = c.deco ? SHADOW[c.deco] : undefined;
+    // das Höhlenbett in der Grotte ohne (Kontrast, „Mit Verlauf“)
+    if (under && !(c.deco === 'bed' && c.biome === 'hoehle')) contactShadow(ctx, P, x + 0.5, y + under[0], h, under[1]);
+    // Hängt nur an Feld, Ding und Beeren (Nachbarn von Hecke und Zaun, Unterstand stehen mit der Welt fest)
+    const key = `${c.deco},${c.tree},${c.h},${c.color},${`${x},${y}` in state.picked}`;
+    const things = this.things(world, x, y, key, () => {
+      const boxes = decoBoxes(world, c, x, y, state.picked, () => homeAt(world, x, y).shelter);
+      // der Hut am Unterstand spannt über mehrere Reihen: nur sortiert, nicht geklemmt
+      return boxes && (c.deco === 'shelterpilz' ? sortBoxes(boxes) : clampRow(boxes, y));
+    });
+    if (things) {
+      // der Hut am Unterstand ist durchscheinend, solange die Figur zu Hause ist (`openRoof`): Quader einzeln
+      if (c.deco === 'shelterpilz') {
+        for (const b of things) {
+          ctx.globalAlpha = b[8] === 'see' ? this.roof : 1;
+          drawBox(ctx, P, b);
+        }
+        ctx.globalAlpha = 1;
+        return;
+      }
+      const at = [x + 0.5, y + 0.5, h] as const; // alles andere als Bild, je Feld und Ding einmal gezeichnet
+      this.sprites.draw(
+        ctx,
+        P,
+        `${x},${y}|${key}`,
+        at,
+        boxesExtent(things, at),
+        (cc, Q) => {
+          for (const b of things) drawBox(cc, Q, b);
+        },
+        this.fine,
+      );
+      return;
+    }
     switch (c.deco) {
-      case 'tree':
-        this.tree(P, x, y, h, c.tree ?? 'oak');
-        break;
-      case 'bush':
-        this.shadow(P, x + 0.5, y + 0.55, h, 0.42);
-        this.leafy(P, x + 0.08, y + 0.12, h, 0.84, 0.76, 0.5, '#3f9a3c', '#5ab651', x, y);
-        this.leafy(P, x + 0.2, y + 0.22, h + 0.5, 0.6, 0.56, 0.16, '#3f9a3c', '#5ab651', x, y);
-        // rote Beeren vorn und oben, damit man den Busch erkennt (gepflückt: keine, bis sie nachwachsen)
-        if (!(`${x},${y}` in state.picked))
-          for (const [bx, bz, bh] of [
-            [0.2, 0.86, 0.3],
-            [0.5, 0.86, 0.18],
-            [0.72, 0.86, 0.34],
-            [0.3, 0.34, 0.66],
-            [0.56, 0.5, 0.66],
-          ] as const)
-            box(ctx, P, x + bx, y + bz, h + bh, 0.09, 0.06, 0.09, '#c8323a', '#ef5b5b');
-        break;
-      case 'fern':
-        for (const [fx, fy, fh] of [
-          [0.3, 0.45, 0.32],
-          [0.48, 0.38, 0.4],
-          [0.62, 0.5, 0.3],
-          [0.42, 0.58, 0.26],
-        ] as const)
-          box(ctx, P, x + fx - 0.05, y + fy, h, 0.1, 0.06, fh, '#3c8a34', '#58a73a');
-        box(ctx, P, x + 0.28, y + 0.42, h + 0.2, 0.44, 0.14, 0.04, '#4f9a3c', '#6dbd47');
-        break;
-      case 'boulder':
-        this.shadow(P, x + 0.5, y + 0.55, h, 0.4);
-        box(ctx, P, x + 0.14, y + 0.2, h, 0.72, 0.6, 0.42, '#878c93', '#9aa0a7');
-        box(ctx, P, x + 0.26, y + 0.28, h + 0.42, 0.46, 0.38, 0.16, '#8f949b', '#a8adb3');
-        box(ctx, P, x + 0.3, y + 0.3, h + 0.58, 0.3, 0.2, 0.03, '#5f9a3c', '#6dbd47');
-        break;
-      case 'mushroom':
-        box(ctx, P, x + 0.44, y + 0.46, h, 0.1, 0.1, 0.16, '#f3efe6');
-        box(ctx, P, x + 0.34, y + 0.36, h + 0.16, 0.3, 0.3, 0.1, '#d9473a', '#e0574a');
-        box(ctx, P, x + 0.42, y + 0.42, h + 0.26, 0.05, 0.05, 0.01, '#ffffff');
-        box(ctx, P, x + 0.54, y + 0.5, h + 0.26, 0.05, 0.05, 0.01, '#ffffff');
-        break;
-      case 'flower':
-        box(ctx, P, x + 0.47, y + 0.47, h, 0.06, 0.06, 0.16, '#3f9a3c');
-        box(ctx, P, x + 0.41, y + 0.41, h + 0.16, 0.18, 0.18, 0.1, c.color ?? '#ffffff', '#f2d14b');
-        break;
-      case 'reed':
-        box(ctx, P, x + 0.3, y + 0.5, h, 0.06, 0.06, 0.5, '#5f8f3a');
-        box(ctx, P, x + 0.6, y + 0.3, h, 0.06, 0.06, 0.62, '#5f8f3a');
-        box(ctx, P, x + 0.59, y + 0.29, h + 0.62, 0.08, 0.08, 0.14, '#7a5432');
-        break;
-      case 'lily':
-        box(ctx, P, x + 0.25, y + 0.3, 0.8, 0.5, 0.4, 0.03, '#4f9a3c', '#6dbd47');
-        box(ctx, P, x + 0.45, y + 0.42, 0.83, 0.12, 0.12, 0.06, '#e77fb3');
-        break;
-      case 'hedge':
-      case 'arch':
-        this.hedge(P, world, x, y, h, c.deco);
-        break;
-      case 'fence':
-        this.fence(P, world, x, y, h, 1);
-        break;
       case 'biggate': // Torhaus: Tür (je nach Öffnung), Türme, Torbogen; führt der Pinguin hierher, sein Umriss
       case 'gatetower':
-        bigGate(ctx, P, world, c, x, y, h, sc.gates, this.guest);
+        this.flat(() => bigGate(ctx, P, world, c, x, y, h, sc.gates, this.guest, this.fine)); // Tür und Beschläge fein
         break;
       case 'portal':
       case 'portalrim':
-        drawPlatform(ctx, P, world, state, x, y, h, c.portal!);
-        break;
-      case 'cactus':
-        box(ctx, P, x + 0.37, y + 0.42, h, 0.26, 0.2, 1.35, '#3f8f3a', '#5aab4a');
-        box(ctx, P, x + 0.13, y + 0.45, h + 0.55, 0.14, 0.14, 0.55, '#3f8f3a', '#5aab4a');
-        box(ctx, P, x + 0.73, y + 0.45, h + 0.8, 0.14, 0.14, 0.45, '#3f8f3a', '#5aab4a');
-        break;
-      case 'crystal':
-        box(ctx, P, x + 0.36, y + 0.4, h, 0.28, 0.24, 1.15, c.color ?? '#b48cf0');
-        box(ctx, P, x + 0.14, y + 0.55, h, 0.2, 0.16, 0.7, c.color ?? '#b48cf0');
-        break;
-      case 'stalagmite':
-        box(ctx, P, x + 0.22, y + 0.3, h, 0.56, 0.5, 0.5, '#2a2c33', '#3c3f47');
-        box(ctx, P, x + 0.32, y + 0.38, h + 0.5, 0.36, 0.32, 0.5, '#2a2c33', '#3c3f47');
-        box(ctx, P, x + 0.41, y + 0.45, h + 1.0, 0.18, 0.16, 0.45, '#2a2c33', '#3c3f47');
-        break;
-      case 'bigshroom':
-        box(ctx, P, x + 0.36, y + 0.42, h, 0.28, 0.24, 1.4, '#efe4d2', '#f7efe2');
-        box(ctx, P, x - 0.25, y - 0.1, h + 1.4, 1.5, 1.2, 0.45, c.color ?? '#d9473a');
-        break;
-      case 'trough':
-      case 'watertrough':
-        box(ctx, P, x + 0.05, y + 0.15, h, 0.9, 0.72, 0.48, '#8a5a30', '#a0703f');
-        box(
-          ctx,
-          P,
-          x + 0.13,
-          y + 0.23,
-          h + 0.4,
-          0.74,
-          0.56,
-          0.08,
-          c.deco === 'trough' ? '#d9b85a' : '#3f8fd8',
-          c.deco === 'trough' ? '#ecd27a' : '#7fc0f0',
-        );
-        break;
-      case 'shelterpilz': {
-        // Riesenpilz: Stiel mit Kragen, darüber der rote Hut mit Tupfen (über die ganze Breite des Unterstands)
-        const { x0, y0, x1, y1 } = homeAt(world, x, y).shelter;
-        box(ctx, P, x + 0.15, y + 0.15, h, 0.7, 0.7, 3.2, '#efe4d2', '#f7efe2');
-        const [w, d] = [x1 - x0 + 1 + 2 * PILZ_OVER, y1 - y0 + 1 + 2 * PILZ_OVER];
-        ctx.globalAlpha = this.roof; // der Hut wird durchscheinend, solange die Figur zu Hause ist (`openRoof`)
-        box(ctx, P, x0 - PILZ_OVER, y0 - PILZ_OVER, h + 3.2, w, d, 0.45, '#d9473a', '#e0574a');
-        box(ctx, P, x0 - PILZ_OVER + 0.9, y0 - PILZ_OVER + 0.7, h + 3.65, w - 1.8, d - 1.4, 0.45, '#d9473a', '#e0574a');
-        for (const dx of [0.6, 2.4, 4.4, 6.2])
-          box(ctx, P, x0 - PILZ_OVER + dx, y1 + 1 + PILZ_OVER - 0.05, h + 3.3, 0.5, 0.05, 0.3, '#ffffff');
-        ctx.globalAlpha = 1;
-        break;
-      }
-      case 'cloudpuff':
-        box(ctx, P, x + 0.15, y + 0.3, h, 0.6, 0.4, 0.3, '#e6eef7', '#ffffff');
+        this.flat(() => drawPlatform(ctx, P, world, state, x, y, h, c.portal!));
         break;
       case 'klangstein':
-        drawStone(ctx, P, x, y, h, heardStone(state, c.story!), sc.now, sc.reduced);
+        contactShadow(ctx, P, x + 0.5, y + 0.5, h, STONE_FOOT); // weicher Fleck wie unter dem Findling
+        drawStone(ctx, P, x, y, h, noteFloat(sc.now, x + y, heardStone(state, c.story!), sc.reduced)); // fein, Note leuchtet
         break;
       case 'gate':
-        this.fence(P, world, x, y, h, 1 - (sc.gates.get(c.gate!) ?? 0));
+        for (const b of clampRow(fenceBoxes(world, x, y, h, 1 - (sc.gates.get(c.gate!) ?? 0)), y)) drawBox(ctx, P, b);
         break;
-      case 'bridge': {
-        const t = sc.gates.get(c.gate!) ?? 0;
-        if (t > 0) box(ctx, P, x, y + 0.5 - t / 2, 0.82, 1, t, 0.18, '#a0703f', '#c0915b');
+      case 'bridge':
+        for (const b of bridgeBoxes(x, y, sc.gates.get(c.gate!) ?? 0)) drawBox(ctx, P, b);
+        break;
+      case 'bed': {
+        // Bett aus Holz (in der Eis-Welt aus Schnee), schläft die Figur, liegt sie darin (mitwachsen-yard-look.ts)
+        const bed = bedBoxes(x, y, h, c.biome === 'eis' ? [...BED_SNOW, 'schnee'] : WOOD_BED);
+        const sleeper = state.sleeping ? sleeperBoxes(x, y, h, sc.look) : [];
+        for (const b of sortBoxes([...bed, ...sleeper])) drawBox(ctx, P, b);
         break;
       }
-      case 'bed':
-        box(ctx, P, x + 0.06, y + 0.05, h, 0.88, 0.9, 0.28, ...(c.biome === 'eis' ? BED_SNOW : BED_FRAME));
-        box(ctx, P, x + 0.1, y + 0.08, h + 0.28, 0.8, 0.26, 0.12, GAME_COLORS.bed.pillow);
-        if (state.sleeping) {
-          box(ctx, P, x + 0.32, y + 0.1, h + 0.4, 0.36, 0.22, 0.3, sc.look.skin);
-          box(ctx, P, x + 0.31, y + 0.09, h + 0.62, 0.38, 0.24, 0.1, sc.look.hair);
-        }
-        box(ctx, P, x + 0.08, y + 0.34, h + 0.28, 0.84, 0.6, state.sleeping ? 0.22 : 0.1, GAME_COLORS.bed.blanket);
-        break;
       case 'sign':
         this.sign(P, state, x, y, h, c);
         break;
     }
-  }
-
-  /** Hecke um den Garten: Blätterbüsche, die zu Nachbarn mit Hecke verbunden sind; der Rosenbogen ist der Eingang */
-  private hedge(P: Projection, world: World, x: number, y: number, h: number, kind: 'hedge' | 'arch') {
-    const { ctx } = this;
-    const joins = (dx: number, dy: number) => {
-      const d = world.cell(x + dx, y + dy).deco;
-      return d === 'hedge' || d === 'arch';
-    };
-    const leaf = '#3f9a3c',
-      light = '#5ab651';
-    if (kind === 'arch') {
-      const vertical = joins(0, -1) || joins(0, 1);
-      const posts: [number, number][] = vertical
-        ? [
-            [0.38, 0.02],
-            [0.38, 0.8],
-          ]
-        : [
-            [0.02, 0.38],
-            [0.8, 0.38],
-          ];
-      for (const [px, py] of posts)
-        box(ctx, P, x + px, y + py, h, 0.18, 0.18, 1.25, GAME_COLORS.fenceDark, GAME_COLORS.fence);
-      if (vertical) box(ctx, P, x + 0.36, y, h + 1.25, 0.22, 1, 0.18, leaf, light);
-      else box(ctx, P, x, y + 0.36, h + 1.25, 1, 0.22, 0.18, leaf, light);
-      for (let i = 0; i < 4; i++) {
-        const t = 0.15 + i * 0.23;
-        const [rx, ry] = vertical ? [x + 0.44, y + t] : [x + t, y + 0.44];
-        box(ctx, P, rx, ry, h + 1.43, 0.1, 0.1, 0.06, i % 2 ? '#e77fb3' : '#ffffff');
-      }
-      return;
-    }
-    if (joins(0, -1)) box(ctx, P, x + 0.2, y, h, 0.6, 0.5, 0.6, leaf, light);
-    if (joins(-1, 0)) box(ctx, P, x, y + 0.2, h, 0.5, 0.6, 0.6, leaf, light);
-    if (joins(1, 0)) box(ctx, P, x + 0.5, y + 0.2, h, 0.5, 0.6, 0.6, leaf, light);
-    if (joins(0, 1)) box(ctx, P, x + 0.2, y + 0.5, h, 0.6, 0.5, 0.6, leaf, light);
-    box(ctx, P, x + 0.15, y + 0.15, h, 0.7, 0.7, 0.7, leaf, light);
-    if ((x * 31 + y * 17) % 3 === 0) box(ctx, P, x + 0.45, y + 0.5, h + 0.7, 0.1, 0.1, 0.05, '#f2d14b');
-  }
-
-  /** Zaun: Pfosten in der Mitte, Latten zu jedem Nachbarn mit Zaun oder Tor. `closed` < 1 öffnet ein Tor. */
-  private fence(P: Projection, world: World, x: number, y: number, h: number, closed: number) {
-    const { ctx } = this;
-    const joins = (dx: number, dy: number) => {
-      const n = world.cell(x + dx, y + dy);
-      return n.deco === 'fence' || n.deco === 'gate';
-    };
-    const gate = world.cell(x, y).deco === 'gate';
-    const color = GAME_COLORS.fence,
-      dark = GAME_COLORS.fenceDark;
-    if (gate) {
-      // Torflügel: offen klappt er zur Seite weg (wird schmaler)
-      const vertical = joins(0, -1) || joins(0, 1);
-      if (closed > 0) {
-        if (vertical) box(ctx, P, x + 0.42, y + 0.5 - 0.5 * closed, h, 0.16, closed, 0.8, color, dark);
-        else box(ctx, P, x + 0.5 - 0.5 * closed, y + 0.42, h, closed, 0.16, 0.8, color, dark);
-      }
-      return;
-    }
-    if (joins(0, -1)) box(ctx, P, x + 0.45, y, h + 0.3, 0.1, 0.5, 0.12, color, dark);
-    if (joins(-1, 0)) box(ctx, P, x, y + 0.45, h + 0.3, 0.5, 0.1, 0.12, color, dark);
-    if (joins(1, 0)) box(ctx, P, x + 0.5, y + 0.45, h + 0.3, 0.5, 0.1, 0.12, color, dark);
-    if (joins(0, 1)) box(ctx, P, x + 0.45, y + 0.5, h + 0.3, 0.1, 0.5, 0.12, color, dark);
-    box(ctx, P, x + 0.4, y + 0.4, h, 0.2, 0.2, 0.75, color, dark);
   }
 
   /** Tafel am Tor: Holzbrett, darauf die Tiere der Gegend – getroffene in Farbe, fehlende als Umriss */
@@ -898,16 +785,15 @@ export class Renderer {
     const { ctx } = this;
     const gate = GATES.find((g) => g.id === c.sign)!;
     const region = REGIONS.find((r) => r.id === gate.region)!;
-    box(ctx, P, x + 0.44, y + 0.44, h, 0.12, 0.12, 0.6, GAME_COLORS.fenceDark);
     const n = region.animals.length;
-    const width = Math.max(1, n * 0.55);
-    box(ctx, P, x + 0.5 - width / 2, y + 0.38, h + 0.6, width, 0.2, 0.5, GAME_COLORS.board, '#d4a874');
+    const width = signWidth(n);
+    for (const b of signBoxes(x, y, h, n)) drawBox(ctx, P, b);
     region.animals.forEach((a, i) => {
       const met = state.met.includes(`${region.id}:${a.species}`);
       const sp = SPECIES[a.species];
       const cx = x + 0.5 - width / 2 + 0.275 + i * 0.55;
       if (!met) ctx.globalAlpha = 0.55;
-      drawModel(ctx, P, sp.parts, cx, y + 0.48, h + 1.1, 's', sp.scale * 0.5, met ? undefined : GAME_COLORS.ink);
+      drawModel(ctx, P, sp.parts, cx, y + 0.48, h + SIGN_TOP, 's', sp.scale * 0.5, met ? undefined : GAME_COLORS.ink);
       ctx.globalAlpha = 1;
     });
   }

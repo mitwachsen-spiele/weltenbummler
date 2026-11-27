@@ -12,6 +12,7 @@
 import { drawModel, type Projection } from '../../../../lib/games/front';
 import { GHOST_MODEL } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
+import { contactShadow } from '../../mitwachsen-fine-2d';
 import type { Box } from '../../mitwachsen-view';
 import { drawBox } from '../../mitwachsen-view';
 import type { World } from '../../mitwachsen-world';
@@ -28,6 +29,8 @@ import {
 } from './mitwachsen-ghost';
 
 const C = GROTTE_COLORS.ghost;
+/** Halbbreite des weichen Flecks unter einem Geist (Felder), so breit wie der Tropfen */
+export const GHOST_FOOT = 0.17;
 /** So lange (ms) warten Töne der Geister auf den Kern, danach verfallen sie */
 const STALE = 500;
 
@@ -136,9 +139,8 @@ export function drawGhosts(
       for (const b of glimmerBoxes(g.x, g.y, ground)) drawBox(ctx, P, b);
     }
     if (g.alpha > 0) {
-      ctx.globalAlpha = 0.3 * g.alpha; // weicher Schatten am Boden
-      drawBox(ctx, P, [g.x - 0.17, g.y - 0.08, ground, 0.34, 0.16, 0.005, GROTTE_COLORS.shadow, GROTTE_COLORS.shadow]);
-      ctx.globalAlpha = g.alpha;
+      ctx.globalAlpha = g.alpha; // weicher Fleck am Boden wie unter allen Körpern, eingeblendet mit dem Geist
+      contactShadow(ctx, P, g.x, g.y, ground, GHOST_FOOT);
       drawModel(ctx, P, GHOST_MODEL, g.x, g.y, g.z, 's');
       if (g.joy !== null) {
         ctx.globalAlpha = g.alpha * wreathAlpha(g.joy, reduced);

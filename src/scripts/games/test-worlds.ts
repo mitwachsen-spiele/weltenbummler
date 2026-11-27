@@ -18,8 +18,8 @@ import { canStep, createWorld, type World } from './mitwachsen-world';
 import { addModels } from './mitwachsen-packs';
 import type { WorldPack } from './mitwachsen-pack-types';
 
-addModels(eis.models); // wie im Spiel, wenn das Paket ankommt: Modelle der Eis-Tiere
-addModels(hoehle.models, hoehle.roosts); // und der Höhlen-Tiere samt der Fledermaus kopfüber
+addModels(eis.models, {}, {}, eis.outlines); // wie im Spiel, wenn das Paket ankommt: Modelle der Eis-Tiere samt Grundform
+addModels(hoehle.models, hoehle.roosts, {}, hoehle.outlines); // und der Höhlen-Tiere samt der Fledermaus kopfüber und Grundform
 addModels(bahn.models, {}, bahn.solos); // und Tok, der Gleisbauer (nach Bau 2 ohne den Maulwurf)
 /** Die Pakete mit eigener Welt und die Fahr-Engine (die Bahn nicht, unten): Eis-Welt, Grotte und die Fahr-Engine */
 export const PACKS = [eis, hoehle, fahrt] as const;

@@ -7,11 +7,17 @@
 // Die Figur sitzt im mittleren Wagen (das Dach dort ist offen, Kopf und Schultern schauen heraus), seine Tür hat bis zur
 // ersten Fahrt einen goldenen Rahmen (nur dort kann das Kind etwas tun: einsteigen), im Tunnel und am Abend leuchten die
 // Lampen. Sonst kein Gold.
+// Fein (Entwurf „Feine Grafik“, Issue 13): Kasten aus Metall, Fensterband und Verglasung aus Lack, Räder mit hellen
+// Naben, Nieten unten am Kasten, dunkle Fensterrahmen unter und über dem Fensterband und um das Zielfenster, zwei Puffer
+// vorn und ein kurzer Schlot mit Kranz auf der Lok (dort steigt der Dampf auf); die Stirnlampen leuchten an weich in den
+// Raum (`halo`), ebenso das Nachtlicht. Bahnhof Bär: Pfosten und Bank aus Holz, Grasdach als Laub, Schild aus Lack; die
+// Reihen des Bahnsteigs bleiben Boden (ohne Muster).
 // Spec: docs/specs/mitwachsen.md („Tok und die Bahn“, Bau 1)
 
-import type { Part } from '../../../../lib/games/front';
+import type { Fine, Part } from '../../../../lib/games/front';
 import { HALT_NUMBER, numberBadge } from '../../mitwachsen-digits';
 import { LOOK, figureParts } from '../../mitwachsen';
+import { FIGURE_LEGS, dress, fine, type Dress } from '../../mitwachsen-fine';
 import { GOLD } from '../../mitwachsen-portals';
 import { TOK_MODEL } from './mitwachsen-tok-model';
 
@@ -32,6 +38,10 @@ export const TRAIN_COLORS = {
   puff: ['#e9ecf5', '#ffffff'], // Dampfkugel beim Umdrehen: Seiten leicht schattiert, oben weiß
   crystal: ['#b48cf0', '#6fd6f0', '#f08cc8'], // Raute: lila, türkis, rosa
   bat: { p: '#f2a7b8', g: '#a08c7c', k: '#1d2838', l: '#f2a7b8', w: '#b9b2dc' },
+  hub: '#c9ced8', // Radnabe
+  rivet: '#e6e8ef', // Niete
+  rim: '#7f5cc8', // Fensterrahmen (dunkleres Lila)
+  collar: '#35383f', // Kranz des Schlots (etwas dunkler als die Räder)
 } as const;
 
 export const STATION_COLORS = {
@@ -84,15 +94,41 @@ const both = ([f, r, ...rest]: Part): Part[] => [
   [f, -r - rest[2], ...rest],
 ];
 
+const HALO: Fine = { halo: true };
+/** Metall auf Kasten, Rädern, Puffern und Schlot, Lack auf Fensterband, Zielfenster und Tür */
+const TRAIN_DRESS: Dress = {
+  ...Object.fromEntries([...S, TRAIN_COLORS.wheel].map((c) => [c, { skin: 'metall' }])),
+  ...Object.fromEntries([TRAIN_COLORS.lila, TRAIN_COLORS.front].map((c) => [c, { skin: 'lack' }])),
+};
+
 /** Kasten eines Wagens (Mitte in der Mitte, vorn in Fahrtrichtung zum Prellbock von Bahnhof Bär) ohne Dach */
 const BODY: readonly Part[] = [
-  ...both([-0.62, -HW + 0.04, 0.02, 0.3, 0.1, 0.18, TRAIN_COLORS.wheel]), // Räder
-  ...both([0.32, -HW + 0.04, 0.02, 0.3, 0.1, 0.18, TRAIN_COLORS.wheel]),
+  ...[-0.62, 0.32].flatMap((f) => [
+    ...both([f, -HW + 0.04, 0.02, 0.3, 0.1, 0.18, TRAIN_COLORS.wheel]), // Räder, außen je eine helle Nabe
+    ...both([f + 0.1, -HW + 0.034, 0.05, 0.1, 0.006, 0.1, TRAIN_COLORS.hub]),
+  ]),
   [-L / 2, -HW, 0.16, L, 2 * HW, 0.4, ...S],
   [-L / 2, -HW, 0.56, L, 2 * HW, 0.3, TRAIN_COLORS.lila, TRAIN_COLORS.lila], // Fensterband
   ...[-0.42, 0, 0.42].map((f): Part => [f - 0.03, -HW - 0.006, 0.56, 0.06, 2 * HW + 0.012, 0.3, ...S]), // Fensterstege
   ...both([-L / 2, -HW - 0.012, 0.83, L, 0.04, 0.04, TRAIN_COLORS.light]), // Leuchtstreifen
+  // Nieten unten am Kasten, neben Tür und Kristall-Raute
+  ...[-0.74, -0.6, -0.46, 0.425, 0.565, 0.705].flatMap((f) =>
+    both([f, -HW - 0.008, 0.22, 0.035, 0.008, 0.035, TRAIN_COLORS.rivet]),
+  ),
 ];
+/**
+ * Dunkle Fensterrahmen unter und über dem Fensterband, außen auf den Stegen; auf der Seite einer offenen Tür oder ihres
+ * goldenen Rahmens (`open`: +1 rechts, −1 links) fehlt das Stück davor
+ */
+const rims = (open: 0 | 1 | -1): Part[] =>
+  [1, -1].flatMap((side) =>
+    [[-L / 2, -0.32], [0.32, L / 2], ...(side === open ? [] : [[-0.32, 0.32]])].flatMap(([a, b]) =>
+      [0.53, 0.8].map((z): Part => {
+        const r = side > 0 ? HW + 0.006 : -HW - 0.012;
+        return [a!, r, z, b! - a!, 0.006, 0.03, TRAIN_COLORS.rim];
+      }),
+    ),
+  );
 /** Dach, ganz oder (`open`) in der Mitte offen: Dort schaut Tok heraus */
 const roof = (open: boolean): Part[] =>
   open
@@ -102,12 +138,12 @@ const roof = (open: boolean): Part[] =>
       ]
     : [[-L / 2 + 0.04, -HW + 0.04, 0.86, L - 0.08, 2 * HW - 0.08, 0.1, ...S]];
 
-/** Lampen an der Front (aus, oder an mit einem kleinen Schein davor): kein Punktlicht, nur Farbe */
+/** Lampen an der Front (aus, oder an mit einem kleinen Schein davor, der weich in den Raum leuchtet) */
 const lamps = (lit: boolean): Part[] =>
   lit
     ? [
         ...both([L / 2, -HW + 0.06, 0.26, 0.03, 0.12, 0.08, TRAIN_COLORS.lit]),
-        ...both([L / 2 + 0.03, -HW + 0.04, 0.24, 0.05, 0.16, 0.12, TRAIN_COLORS.glow]),
+        ...both([L / 2 + 0.03, -HW + 0.04, 0.24, 0.05, 0.16, 0.12, TRAIN_COLORS.glow]).map((p) => fine(p, HALO)),
       ]
     : both([L / 2, -HW + 0.06, 0.26, 0.03, 0.12, 0.08, TRAIN_COLORS.lamp]);
 
@@ -118,6 +154,12 @@ const FRONT: readonly Part[] = [
   ...both([0.1, -HW - 0.014, 0.36, 0.08, 0.012, 0.08, TRAIN_COLORS.crystal[0]]),
   ...both([0.02, -HW - 0.016, 0.3, 0.08, 0.012, 0.06, TRAIN_COLORS.crystal[1]]),
   ...both([0.18, -HW - 0.016, 0.3, 0.08, 0.012, 0.06, TRAIN_COLORS.crystal[2]]),
+  // Rahmen um das Zielfenster unten und oben, zwei Puffer unter den Lampen, kurzer Schlot mit Kranz (dort dampft es)
+  [L / 2, -0.3, 0.57, 0.02, 0.6, 0.03, TRAIN_COLORS.rim],
+  [L / 2, -0.3, 0.84, 0.02, 0.6, 0.03, TRAIN_COLORS.rim],
+  ...both([L / 2, -HW + 0.06, 0.16, 0.06, 0.1, 0.08, TRAIN_COLORS.wheel]),
+  [0.3, -0.07, 0.96, 0.14, 0.14, 0.08, ...S],
+  [0.28, -0.09, 1.04, 0.18, 0.18, 0.03, TRAIN_COLORS.collar],
 ];
 
 /** Tok sitzt im hinteren Wagen: sein Modell, etwas tiefer, Kopf und Helm schauen oben heraus */
@@ -125,7 +167,7 @@ const RIDER: readonly Part[] = TOK_MODEL.map(([f, r, z, ...rest]): Part => [f, r
 
 /** Die Figur sitzt im mittleren Wagen: ohne Beine, Kopf und Schultern schauen oben heraus */
 const FIGURE: readonly Part[] = figureParts(LOOK)
-  .slice(4)
+  .slice(FIGURE_LEGS)
   .map(([f, r, z, ...rest]): Part => [f - 0.05, r, z + 0.06, ...rest]);
 
 /** Offene Tür zur Seite des Bahnsteigs (`side` +1 rechts, −1 links) */
@@ -144,15 +186,17 @@ const frame = (side: 1 | -1): Part[] => {
 const WARM: readonly Part[] = [-0.76, -0.36, 0.06, 0.48].flatMap((f) =>
   both([f, -HW - 0.01, 0.6, 0.28, 0.012, 0.2, TRAIN_COLORS.warm]),
 );
-/** Kleines Nachtlicht über der Tür der Lok, nach „Gute Nacht“ (die Lampen sind aus) */
-const NIGHT: readonly Part[] = both([-0.06, -HW - 0.012, 0.9, 0.12, 0.012, 0.08, TRAIN_COLORS.night]);
+/** Kleines Nachtlicht über der Tür der Lok, nach „Gute Nacht“ (die Lampen sind aus); es leuchtet weich */
+const NIGHT: readonly Part[] = both([-0.06, -HW - 0.012, 0.9, 0.12, 0.012, 0.08, TRAIN_COLORS.night]).map((p) =>
+  fine(p, HALO),
+);
 /**
  * Kristall-Wimpel nach der Laternenfahrt (Stufe `fest`): Stange auf dem Dach der Lok, ein lila Wimpel mit Kristall-Raute
  * in Türkis und Rosa (kein Gold: dort kann das Kind nichts tun)
  */
 const PENNANT: readonly Part[] = [
-  [-0.5, -0.03, 0.96, 0.05, 0.05, 0.62, TRAIN_COLORS.mast],
-  [-0.5, 0.02, 1.32, 0.02, 0.36, 0.24, TRAIN_COLORS.lila],
+  fine([-0.5, -0.03, 0.96, 0.05, 0.05, 0.62, TRAIN_COLORS.mast], { skin: 'holz' }),
+  fine([-0.5, 0.02, 1.32, 0.02, 0.36, 0.24, TRAIN_COLORS.lila], { skin: 'stoff' }), // Wimpel aus Stoff
   [-0.5, 0.14, 1.4, 0.022, 0.1, 0.08, TRAIN_COLORS.crystal[1]],
   [-0.5, 0.25, 1.42, 0.022, 0.06, 0.04, TRAIN_COLORS.crystal[2]],
 ];
@@ -174,25 +218,30 @@ export type CarLook = {
   night?: boolean;
   pennant?: boolean;
 };
+const FINE_BODY = dress(BODY, TRAIN_DRESS);
+const FINE_FRONT = dress(FRONT, TRAIN_DRESS);
+const FINE_ROOF = [dress(roof(false), TRAIN_DRESS), dress(roof(true), TRAIN_DRESS)] as const;
+
 export const carParts = (k: CarLook): Part[] => [
-  ...BODY,
-  ...roof((k.kind === 'rear' && k.tok) || !!k.rider),
-  ...(k.kind === 'loco' ? [...FRONT, ...lamps(!!k.lit)] : []),
+  ...FINE_BODY,
+  ...rims(k.door || k.frame || 0),
+  ...FINE_ROOF[+((k.kind === 'rear' && k.tok) || !!k.rider)]!,
+  ...(k.kind === 'loco' ? [...FINE_FRONT, ...lamps(!!k.lit)] : []),
   ...(k.kind === 'rear' && k.tok ? RIDER : []),
   ...(k.rider ? FIGURE : []),
-  ...(k.door ? [door(k.door)] : []),
+  ...(k.door ? [fine(door(k.door), { skin: 'lack' })] : []),
   ...(k.frame ? frame(k.frame) : []),
   ...(k.warm ? WARM : []),
   ...(k.kind === 'loco' && k.night ? NIGHT : []),
   ...(k.kind === 'loco' && k.pennant ? PENNANT : []),
 ];
 
-/** Weiße Dampfwölkchen über der Lok, je Phase (0 … 3) anders hoch (nicht bei reduzierter Bewegung) */
+/** Weiße Dampfwölkchen über dem Schlot der Lok, je Phase (0 … 3) anders hoch (nicht bei reduzierter Bewegung) */
 export const steamParts = (phase: number): Part[] =>
   [0, 1, 2].map((i): Part => {
     const k = (phase + i) % 4;
     const s = 0.1 + k * 0.03;
-    return [0.4 - k * 0.12, -s / 2 + (i - 1) * 0.08, 1.0 + k * 0.2, s, s, s, TRAIN_COLORS.steam];
+    return [0.32 - k * 0.12, -s / 2 + (i - 1) * 0.08, 1.08 + k * 0.2, s, s, s, TRAIN_COLORS.steam];
   });
 
 /** Durchmesser der Dampfkugel über einem Wagen beim Umdrehen, ganz aufgeblüht (in Feldern; ein Wagen ist 1,6 lang) */
@@ -259,20 +308,24 @@ export const signAt = (x: number, y: number, side: readonly [number, number]) =>
   y: y + (side[1] * ROOF_SIZE.deep) / 2,
 });
 
-/** Grasdach von Bahnhof Bär: nur die Platte, ein eigener Körper (ein späterer Durchblick träfe nur sie) */
-export const ROOF: readonly Part[] = [roofPlate(...SC.roof)];
+const WOOD: Fine = { skin: 'holz' };
+/** Grasdach von Bahnhof Bär: nur die Platte, ein eigener Körper (ein späterer Durchblick träfe nur sie); Gras als Laub */
+export const ROOF: readonly Part[] = [fine(roofPlate(...SC.roof), { skin: 'blatt' })];
 /** Unter dem Grasdach: zwei Pfosten am hinteren Rand, davor die Bank (Lehne hinten); die Kante am Gleis bleibt frei */
-export const ROOF_POSTS: readonly Part[] = [
-  ...roofPosts(SC.wood),
-  [0.36, -0.6, 0.3, 0.4, 1.2, 0.08, SC.bench, SC.bench],
-  [0.7, -0.6, 0.38, 0.06, 1.2, 0.3, SC.bench],
-  ...[-0.5, 0.42].flatMap((r) => [0.4, 0.66].map((f): Part => [f, r, 0.04, 0.07, 0.07, 0.26, SC.wood])),
-];
+export const ROOF_POSTS: readonly Part[] = dress(
+  [
+    ...roofPosts(SC.wood),
+    [0.36, -0.6, 0.3, 0.4, 1.2, 0.08, SC.bench, SC.bench],
+    [0.7, -0.6, 0.38, 0.06, 1.2, 0.3, SC.bench],
+    ...[-0.5, 0.42].flatMap((r) => [0.4, 0.66].map((f): Part => [f, r, 0.04, 0.07, 0.07, 0.26, SC.wood])),
+  ],
+  { [SC.wood]: WOOD, [SC.bench]: WOOD },
+);
 
 /** Schild auf dem Dach, zur Kamera (Körper schaut nach Süden): Bär auf Grün, 2 × 2 Schildbreite, ohne Text */
 export const SIGN: readonly Part[] = [
-  [-0.05, -0.05, 0, 0.1, 0.1, 0.16, SC.wood],
-  [-0.03, -0.44, 0.16, 0.06, 0.88, 0.88, SC.sign, SC.sign],
+  fine([-0.05, -0.05, 0, 0.1, 0.1, 0.16, SC.wood], WOOD),
+  fine([-0.03, -0.44, 0.16, 0.06, 0.88, 0.88, SC.sign, SC.sign], { skin: 'lack' }),
   ...pixels(BEAR, SC.bear, 0.03, 0, 0.96, 0.09),
   ...numberBadge(HALT_NUMBER.baer, 0.045, -0.31, 1.03), // oben rechts im Bild: Bahnhof 1 (Issue 40)
 ];

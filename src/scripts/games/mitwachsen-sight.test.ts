@@ -1,6 +1,7 @@
 // Hinführen zu Sehenswürdigkeiten (Issue 28, Review vom 25.11.2026): Regeln in mitwachsen-sight.ts, Bild und Ton in
 // mitwachsen-sight-look.ts. Geprüft wird in der Eis-Welt von Seed 1 (Schneehaufen, Eiszapfen-Glockenspiel), dazu die
 // Liste aller Pakete: Jedes Spielzeug und jedes Fahrzeug hat einen Eintrag.
+import { haloCompact } from '../../lib/games/shade';
 import { describe, expect, it } from 'vitest';
 import { GOLD } from '../../data/games/mitwachsen-portals';
 import { STORIES } from '../../data/games/mitwachsen-stories';
@@ -29,7 +30,16 @@ import {
   type Sight,
   type SightEvent,
 } from './mitwachsen-sight';
-import { FRIEND_ID, FriendLook, HUSH, friendParts, friendScore, hush, melodyStart } from './mitwachsen-sight-look';
+import {
+  FRIEND_COLORS,
+  FRIEND_ID,
+  FriendLook,
+  HUSH,
+  friendParts,
+  friendScore,
+  hush,
+  melodyStart,
+} from './mitwachsen-sight-look';
 import { initialState, step, type State } from './mitwachsen-state';
 import { canStep, kesselPlace } from './mitwachsen-world';
 import { BAHN_PACK, DUG, EIS_PACK, FAHRT_PACK, GRUBE_PACK, HOEHLE_PACK, PACKS, worldOf } from './test-worlds';
@@ -442,6 +452,14 @@ describe('Hinführen: Bild und Ton', () => {
         expect(gold.has(side) || gold.has(top ?? '')).toBe(false);
       }
     expect(friendParts(0)).not.toEqual(friendParts(1));
+  });
+
+  it('nur sein Kern leuchtet (`halo`, kompakt), Flügel und Schweif nicht', () => {
+    for (let k = 0; k < 4; k++) {
+      const lit = friendParts(k).filter((p) => p[9]?.halo);
+      expect(lit.map((p) => p[6])).toEqual([FRIEND_COLORS.core]);
+      expect(haloCompact(lit[0]![3], lit[0]![4], lit[0]![5])).toBe(true);
+    }
   });
 
   it('er gleitet weich zu seinem Feld, glimmt im Dunkeln und steht bei reduzierter Bewegung gleich dort', () => {

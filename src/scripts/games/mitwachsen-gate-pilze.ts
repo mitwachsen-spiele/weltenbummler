@@ -22,7 +22,9 @@ import {
   type GateBuild,
   type GateCtx,
   type GateMotion,
+  plantInto,
 } from './mitwachsen-gate-kit';
+import { GIANT, giantBoxes, octagonReach, stemPieceRadius, type Giant } from './mitwachsen-gate-flora';
 import type { PlateLook } from './mitwachsen-plate';
 
 type Cam = GateCtx['cam'];
@@ -104,43 +106,11 @@ function shell(v: Vox, box: readonly number[], f: Shape, cam?: Cam, all = false)
       }
 }
 
-/* ---------- Die zwei Riesenpilze: Sockel, Stiel, Hut ---------- */
+/* ---------- Die zwei Riesenpilze: Sockel (Voxel), Stiel und Hut (feine Modelle, mitwachsen-gate-flora.ts) ---------- */
 
-const HAT = { R1: 2.2, R2: 1.45, H: 1.9 }; // Hut 4,4 breit, der sichtbare Stiel nur etwa 2,5 hoch
-// Tupfen auf dem Hut: je (x, z, Radius) in Hutradien
-const SPOTS = [
-  0.02, 0.05, 0.17, 0.55, 0.3, 0.15, -0.5, 0.35, 0.15, 0.15, -0.55, 0.15, -0.6, -0.3, 0.13, 0.66, -0.38, 0.12,
-];
-function spot(p1: number, p2: number) {
-  for (let s = 0; s < SPOTS.length; s += 3) {
-    const [sx = 0, sy = 0, sr = 0] = SPOTS.slice(s, s + 3);
-    if ((p1 - sx) ** 2 + (p2 - sy) ** 2 < sr * sr) return true;
-  }
-  return false;
-}
-
-function hatPaint(cx: number, hy: number, x: number, y: number, z: number): Paint {
-  const p1 = (x - cx) / HAT.R1,
-    p2 = (z - HZ) / HAT.R2,
-    w = p1 * p1 + p2 * p2,
-    a = y - hy;
-  if (w > 1) return null;
-  const top = HAT.H * (1 - w) ** 0.42 * (1 - 0.18 * w * w);
-  const bot = 0.12 + 0.2 * (1 - w);
-  if (a > top || a < bot) return null;
-  if (a > top - 0.22 || w > 0.84) return spot(p1, p2) ? BLAU[2] : a > top - 0.22 ? BLAU[0] : BLAU[1];
-  if (a < bot + 0.13) return Math.floor(((Math.atan2(p2, p1) + Math.PI) / (2 * Math.PI)) * 36) % 2 ? BLAU[3] : BLAU[4];
-  return BLAU[1];
-}
-
-/** Stiel: fassförmig (unten 0,99, oben 0,84 Radius; endet vor dem Durchgang), mit Rillen */
-const stemR = (y: number) => lerp(0.99, 0.84, Math.min(1, Math.max(0, y / 4)));
-function stemPaint(cx: number, x: number, y: number, z: number): Paint {
-  const [dx, dz] = [x - cx, z - PZ],
-    r = stemR(y);
-  if (y > 3.8 || dx * dx + dz * dz > r * r) return null;
-  return Math.floor(((Math.atan2(dz, dx) + Math.PI) / (2 * Math.PI)) * 24) % 3 === 0 ? STIEL[1] : STIEL[0];
-}
+const HAT = GIANT.hat; // Hut 4,4 breit, der sichtbare Stiel nur etwa 2,5 hoch
+/** So weit über der Oberfläche von Stiel und Hut liegt die Mitte einer Ranke: Ihr Voxel (1/8) berührt sie immer */
+const CLING = 3 / 64;
 
 /** bemooster Felssockel um den Fuß des Stiels; bleibt ganz neben dem Weg (|x| ≥ 2,5) */
 function socketPaint(cx: number, x: number, y: number, z: number, i: number, j: number, k: number): Paint {
@@ -151,22 +121,27 @@ function socketPaint(cx: number, x: number, y: number, z: number, i: number, j: 
   return h < 0.2 ? MOOS[2] : h < 0.45 ? MOOS[1] : h < 0.85 ? MOOS[0] : MOOS[4];
 }
 
-function giant(v: Vox, side: number, t: number, cam: Cam, all?: boolean) {
-  const [cx, hy] = [side * PX, hatY(t)];
-  const box = [cx - HAT.R1 - 0.1, 0, HZ - HAT.R2 - 0.1, cx + HAT.R1 + 0.1, hy + HAT.H + 0.2, HZ + HAT.R2 + 0.2];
-  const paint: Shape = (x, y, z, i, j, k) =>
-    hatPaint(cx, hy, x, y, z) ?? socketPaint(cx, x, y, z, i, j, k) ?? stemPaint(cx, x, y, z);
-  shell(v, box, paint, cam, all);
+/** Sockel eines Riesenpilzes aus Voxeln (Fels und Moos gehören zum Torhaus) */
+function socket(v: Vox, side: number, cam: Cam, all?: boolean) {
+  const cx = side * PX;
+  const box = [cx - 1.7, 0, PZ - 1.3, cx + 1.7, 1.05, PZ + 1.3];
+  shell(v, box, (x, y, z, i, j, k) => socketPaint(cx, x, y, z, i, j, k), cam, all);
 }
 
-/** Ranken um den Stiel: ein welliges Band rundherum, mit Leuchtspitzen, Moos und flachen Hütchen als Konsolen */
-function stemVines(v: Vox, side: number) {
+/** Stiel und Hut eines Riesenpilzes als feines Modell: Hut gestuft in Lack mit Tupfen, Stiel mit Fasern */
+export const giantOf = (side: number, t: number): Giant => ({ x: side * PX, z: PZ, hatZ: HZ, hatY: hatY(t) });
+
+/**
+ * Ranken um den Stiel: ein welliges Band rundherum, mit Leuchtspitzen, Moos und flachen Hütchen als Konsolen; sie
+ * liegen auf der Oberfläche des feinen Stiels (Achteck, `octagonReach`), `CLING` darüber
+ */
+function stemVines(v: Vox, side: number, t: number) {
   const cx = side * PX;
   for (let a = 0; a < 170; a++) {
     const f = (a / 170) * 2 * Math.PI,
       [nx, nz] = [Math.cos(f), Math.sin(f)];
     const y = 1.75 + 0.55 * Math.sin(2 * f + side) + 0.22 * Math.sin(5 * f);
-    const r = stemR(y) + 0.1;
+    const r = stemPieceRadius(y, hatY(t)) * octagonReach(f) + CLING;
     const [x, z] = [cx + nx * r, PZ + nz * r];
     if (z >= 0.5 || Math.abs(x) < 2.5) continue;
     const c = (side > 0 ? TUERKIS : ROSA)[a % 9 < 2 ? 1 : 0];
@@ -183,13 +158,17 @@ function stemVines(v: Vox, side: number) {
   }
 }
 
-/** Bögen unter dem Hutrand: zwei Ranken hängen in weichen Bögen rundherum, an den tiefsten Stellen leuchtet es */
+/**
+ * Bögen unter dem Hutrand: zwei Ranken hängen in weichen Bögen rundherum, an den tiefsten Stellen leuchtet es; sie
+ * hängen am Rand der untersten Lage des feinen Huts (Achteck, `octagonReach`)
+ */
 function rimVines(v: Vox, side: number, t: number) {
   const [cx, hy] = [side * PX, hatY(t) + 0.1];
   const c = side > 0 ? ROSA : TUERKIS;
   for (let a = 0; a < 200; a++) {
     const f = (a / 200) * 2 * Math.PI;
-    const [x, z] = [cx + (HAT.R1 + 0.04) * Math.cos(f), HZ + (HAT.R2 + 0.04) * Math.sin(f)];
+    const reach = octagonReach(f);
+    const [x, z] = [cx + (HAT.r1 * reach + CLING) * Math.cos(f), HZ + (HAT.r2 * reach + CLING) * Math.sin(f)];
     if (z >= 0.5) continue;
     const bog = Math.abs(Math.sin(f * 6 + side));
     const [i, j, k] = [vx(x), vx(hy - 0.3 * bog), vx(z)];
@@ -282,8 +261,8 @@ export function pilzVox(g: Pick<GateCtx, 'open' | 'cam' | 'all'>): Vox {
   const v = new Vox();
   moss(v);
   for (const side of [-1, 1]) {
-    giant(v, side, t, g.cam, g.all); // mit `all` die ganze Hülle (außer nach unten)
-    stemVines(v, side);
+    socket(v, side, g.cam, g.all); // mit `all` die ganze Hülle (außer nach unten)
+    stemVines(v, side, t);
     rimVines(v, side, t);
   }
   pads(v, curl(t));
@@ -294,6 +273,8 @@ export function pilzVox(g: Pick<GateCtx, 'open' | 'cam' | 'all'>): Vox {
 
 export const build: GateBuild = (p, g) => {
   pilzVox(g).emit(p);
+  const t = Math.min(1, Math.max(0, g.open));
+  for (const side of [-1, 1]) plantInto(p, giantBoxes(giantOf(side, t)));
   return [];
 };
 

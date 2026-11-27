@@ -10,7 +10,7 @@
 // rechtwinkligen Kurve), nicht das der Höhlenbahn. Töne: sein Signal D5 → A5 (`RIDES`), Ankunft A5 → D5.
 // Spezifikation: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“)
 
-import type { Dir } from '../../../../lib/games/front';
+import type { Dir, Fine } from '../../../../lib/games/front';
 import type { Point } from '../../../../data/games/mitwachsen';
 import {
   GRUBE_RAIL,
@@ -153,11 +153,13 @@ export function funkelBodies(state: State, world: World, at: RideAt, rang = -Inf
 
 // ---------- Gleis ----------
 
-/** Quader in einem Feld, ohne Lage: x, y (nach vorn), z über dem Boden, Breite, Tiefe, Höhe, Seite, oben */
-type Local = readonly [number, number, number, number, number, number, string, string];
+/** Quader in einem Feld, ohne Lage: x, y (nach vorn), z über dem Boden, Breite, Tiefe, Höhe, Seite, oben, Feinheit */
+type Local = readonly [number, number, number, number, number, number, string, string, Fine];
 const [G1, G2, W, Z] = [0.32, 0.62, 0.06, 0.04]; // schmale Spur: Schienen links und rechts, Breite, auf den Schwellen
-const sleeper = (x: number, y: number, w: number, d: number): Local => [x, y, 0, w, d, Z, ...GRUBE_RAIL.sleeper];
-const bar = (x: number, y: number, w: number, d: number): Local => [x, y, Z, w, d, 0.05, ...GRUBE_RAIL.rail];
+/** Fein: Schwellen mit Maserung (Holz, in ihrer Farbe aus Schiefer), Schienen gebürstet (Metall) */
+const [WOOD, METAL]: readonly [Fine, Fine] = [{ skin: 'holz' }, { skin: 'metall' }];
+const sleeper = (x: number, y: number, w: number, d: number): Local => [x, y, 0, w, d, Z, ...GRUBE_RAIL.sleeper, WOOD];
+const bar = (x: number, y: number, w: number, d: number): Local => [x, y, Z, w, d, 0.05, ...GRUBE_RAIL.rail, METAL];
 /** Gerade von oben nach unten */
 const STRAIGHT: readonly Local[] = [
   sleeper(0.18, 0.12, 0.64, 0.16),
@@ -203,7 +205,7 @@ export function railShape(to: string): readonly Local[] | undefined {
 export const grubeRails: DrawRails = (c: Cell, x: number, y: number) => {
   const shape = c.ride === FUNKEL.id && c.lane?.to ? railShape(c.lane.to) : undefined;
   return shape
-    ? shape.map(([bx, by, bz, w, d, h, side, top]): Box => [x + bx, y + by, c.h + bz, w, d, h, side, top])
+    ? shape.map((b): Box => [x + b[0], y + b[1], c.h + b[2], b[3], b[4], b[5], b[6], b[7], undefined, b[8]])
     : null;
 };
 
@@ -287,7 +289,7 @@ export function haltBodies(state: State, world: World): readonly RideBody[] {
   const far = cells.at(-1);
   const at = ([x, y]: Point) => ({ x, y, z: world.cell(x, y).h, dir: 's' as const });
   return [
-    ...cells.map((p, i): RideBody => ({ id: `grube:steg:${i}`, key: 'grube:steg', ...at(p), parts: PLANK })),
+    ...cells.map((p, i): RideBody => ({ id: `grube:steg:${i}`, key: 'grube:steg', ...at(p), parts: PLANK, foot: 0 })),
     ...(far ? [{ id: 'grube:schild', key: 'grube:schild', ...at(far), parts: HALT_SIGN }] : []),
     ...lapStonesOf(world, state).map((p, i): RideBody => {
       // Zahlensteine: Im Dunkel der Grotte hat jeder ein kleines Loch der Dunkelmaske (`glow`), der gewählte ist Petrol

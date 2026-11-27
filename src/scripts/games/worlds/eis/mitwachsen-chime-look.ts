@@ -7,15 +7,18 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Gletscherkessel“ und „Was angezeigt wird“)
 
 import { ICE_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
+import type { Fine } from '../../../../lib/games/front';
 import type { Cell } from '../../mitwachsen-cell';
 import type { PackEvent } from '../../mitwachsen-pack-types';
 import type { Box } from '../../mitwachsen-view';
+import { ICE_FINE } from './mitwachsen-ice-look';
 import type { World } from '../../mitwachsen-world';
 import type { Scored } from '../../sfx';
 import { lipOf } from './mitwachsen-chime';
 
 const [ICE, ICE_TOP] = ICE_COLORS.ice;
 const [GLASS, GLASS_TOP] = ICE_COLORS.slide; // die Spitze heller, fast durchsichtig
+const [SNOW, SNOW_TOP] = ICE_COLORS.snow;
 
 /** Länge des Zapfens als Anteil der Höhe unter der Kante: Ton 0 fast bis zum Boden, je Ton etwas kürzer */
 const length = (note: number) => 0.85 - 0.075 * note;
@@ -24,27 +27,33 @@ const length = (note: number) => 0.85 - 0.075 * note;
  * Quader eines Eiszapfens auf dem Feld (x, y) (Inhalt `c`, Ton `c.note`): die Eiskante oben an der Klippe dahinter,
  * über die ganze Breite des Felds (so wird die Reihe eine Kante), und der Zapfen darunter in drei schmaleren Stücken,
  * in der Reihenfolge, in der die 2D-Ansicht sie übereinander malt (von unten nach oben).
- * `sway` (in Feldern) schiebt den Zapfen seitlich, unten weiter als oben (Schwingen in 2D).
+ * `sway` (in Feldern) schiebt den Zapfen seitlich, unten weiter als oben (Schwingen in 2D). Fein: Kante und dicke
+ * Stücke aus Eisblock, die helle Spitze glitzert (`halo`), auf der Kante liegt eine dünne Schneeschicht.
  */
 export function chimeBoxes(world: World, c: Cell, x: number, y: number, sway = 0): Box[] {
   const lip = lipOf(world.cell(x, y - 1), c);
   const top = c.h + lip;
   const len = (lip - 0.1) * length(c.note ?? 0); // unter der Kante (0,1 dick)
-  const parts: [w: number, share: number, side: string, up: string][] = [
-    [0.2, 0.45, ICE, ICE_TOP],
-    [0.13, 0.33, ICE, GLASS_TOP],
-    [0.06, 0.22, GLASS, GLASS_TOP],
+  const parts: [w: number, share: number, side: string, up: string, fine: Fine][] = [
+    [0.2, 0.45, ICE, ICE_TOP, ICE_FINE.block],
+    [0.13, 0.33, ICE, GLASS_TOP, ICE_FINE.block],
+    [0.06, 0.22, GLASS, GLASS_TOP, ICE_FINE.glow],
   ];
   const out: Box[] = [];
   let z = top - 0.1;
   let down = 0;
-  for (const [w, share, side, up] of parts) {
+  for (const [w, share, side, up, fine] of parts) {
     const h = len * share;
     z -= h;
     down += share;
-    out.unshift([x + 0.5 - w / 2 + sway * down, y + 0.13 - w / 2, z, w, w, h, side, up]); // die Spitze zuerst
+    out.unshift([x + 0.5 - w / 2 + sway * down, y + 0.13 - w / 2, z, w, w, h, side, up, undefined, fine]); // die Spitze zuerst
   }
-  return [...out, [x, y, top - 0.1, 1, 0.2, 0.1, ICE, ICE_TOP]]; // zuletzt die Eiskante: 2D malt von unten nach oben
+  // zuletzt die Eiskante und der Schnee darauf: 2D malt von unten nach oben
+  return [
+    ...out,
+    [x, y, top - 0.1, 1, 0.2, 0.1, ICE, ICE_TOP, undefined, ICE_FINE.block],
+    [x, y, top, 1, 0.2, 0.025, SNOW, SNOW_TOP, undefined, ICE_FINE.snow],
+  ];
 }
 
 const SWING_MS = 700; // so lange schwingt ein angeschlagener Zapfen

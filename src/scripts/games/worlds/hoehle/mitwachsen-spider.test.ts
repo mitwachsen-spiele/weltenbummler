@@ -9,7 +9,9 @@ import { CAVE_SPECIES } from '../../../../data/games/mitwachsen-hoehle';
 import { ICE_SPECIES } from '../../../../data/games/mitwachsen-eis';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
 import { SPIDER_MODELS, type SpiderPose } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { SPIDER_FINE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-fine';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
+import type { Part } from '../../../../lib/games/front';
 import type { Cell } from '../../mitwachsen-cell';
 import { drawDeco, type DecoAt } from '../../mitwachsen-view';
 import type { Scored } from '../../sfx';
@@ -166,6 +168,20 @@ describe('Tupfspinne: Gruß', () => {
     const spiders = (warm: boolean) => view.bodies!(s, w, { ...at, warm }).filter((b) => b.id.startsWith('spider:'));
     expect(spiders(false).every((b) => !b.key.includes('asleep'))).toBe(true);
     expect(spiders(true).every((b) => b.key.includes('asleep'))).toBe(true);
+  });
+
+  it('ihre Teile behalten beim Skalieren Farben, Fläche und Feinheit', () => {
+    const models = SPIDER_FINE_MODELS;
+    const plain = models.rest;
+    const fine = { skin: 'fell' as const };
+    models.rest = plain.map((p): Part => [p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], fine]);
+    try {
+      const body = spiderParts({ pose: 'rest', lift: 0.4321 }).slice(0, plain.length);
+      expect(body.map((p) => p.slice(6))).toEqual(models.rest.map((p) => p.slice(6)));
+      expect(body.every((p) => p[9] === fine)).toBe(true);
+    } finally {
+      models.rest = plain;
+    }
   });
 
   it('ihr Faden reicht bis an die Oberkante des Netzes, auch abgeseilt', () => {

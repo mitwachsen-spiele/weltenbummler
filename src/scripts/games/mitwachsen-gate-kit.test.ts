@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Vox, parts } from './mitwachsen-gate-kit';
+import { Vox, parts, plantInto } from './mitwachsen-gate-kit';
+import type { GateBox } from './mitwachsen-gate-flora';
 
 /** Anzahl Vierecke und ihre Normalen in allen Teilen */
 function quads(p: ReturnType<typeof parts>) {
@@ -80,5 +81,16 @@ describe('Baukasten der Zugänge', () => {
       const [a, b] = placed.sort((p, q) => (p[0] - q[0]) * right[0] + (p[1] - q[1]) * right[1]);
       expect([b![0] - a![0], b![1] - a![1]]).toEqual([right[0], right[1]]);
     }
+  });
+
+  it('feine Pflanzen: winzige Teile ohne Schattenwurf in `plantTiny`, leuchtende in `bright`, sonst `plant`', () => {
+    const big: GateBox = [0, 0, 0, 0.3, 0.3, 0.3, '#336633', '#448844', { skin: 'blatt' }];
+    const tiny: GateBox = [0, 0.3, 0, 0.04, 0.3, 0.01, '#ddccbb', '#ddccbb', {}];
+    const p = parts();
+    plantInto(p, [big, tiny]);
+    expect([p.plant.empty, p.plantTiny.empty, p.bright.empty]).toEqual([false, false, true]);
+    const q = parts();
+    plantInto(q, [big, tiny], true);
+    expect([q.plant.empty, q.plantTiny.empty, q.bright.empty]).toEqual([true, true, false]);
   });
 });

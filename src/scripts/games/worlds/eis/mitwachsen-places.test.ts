@@ -107,6 +107,11 @@ describe('Laternen-Tannen', () => {
     const colors = (b: typeof on) => new Set(b.parts.flatMap((p) => [p[6], p[7] ?? p[6]]));
     expect(colors(on).has(PLACE_COLORS.on[0])).toBe(true);
     expect(colors(off).has(PLACE_COLORS.on[0])).toBe(false);
+    // fein: Der Kristall leuchtet weich nur, wenn sie brennt; Haken und Rahmen aus Metall; sie hängt, kein Fleck am Boden
+    expect(on.parts.filter((p) => p[9]?.halo).map((p) => p[6])).toEqual([PLACE_COLORS.on[0], PLACE_COLORS.on[1]]);
+    expect(off.parts.some((p) => p[9]?.halo)).toBe(false);
+    expect(off.parts.filter((p) => p[6] === PLACE_COLORS.hook).every((p) => p[9]?.skin === 'metall')).toBe(true);
+    expect([on.foot, off.foot]).toEqual([0, 0]);
     for (const b of [on, off]) {
       expect(colors(b).has(GOLD.top) || colors(b).has(GOLD.side)).toBe(false);
       expect(b.id.startsWith('ride:')).toBe(false); // nicht antippbar

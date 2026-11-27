@@ -28,7 +28,12 @@ export type RideBody = {
   glow?: true; // eine Lampe vorn leuchtet, ohne dass die Figur darin sitzt (die Dunkelmaske der Grotte öffnet dort ein kleines Loch)
   sheer?: true; // durchscheinend gezeichnet (Dachplatte eines Bahnhofs, solange die Figur darunter steht)
   beacon?: true; // der Körper selbst glimmt, wie weit die Figur auch weg ist (kleines Loch der Dunkelmaske mitten auf ihm: der Erdhügel)
+  foot?: number; // Halbbreite des weichen Flecks am Boden (sonst `RIDE_FOOT`); 0: kein Fleck (schwebt, liegt flach, steht nicht in der Mitte)
 };
+
+/** Halbbreite des weichen Flecks unter einem Körper, gleich in 2D und 3D */
+export const RIDE_FOOT = 0.3;
+export const footOf = (r: Pick<RideBody, 'foot'>) => r.foot ?? RIDE_FOOT;
 
 /**
  * Was die Körper je Bild brauchen: Zeit, Bruchteil des laufenden Takts (0 … 1), reduzierte Bewegung, Abendlicht (`lit`:

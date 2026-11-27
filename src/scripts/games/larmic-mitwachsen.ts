@@ -19,7 +19,8 @@ import { Sfx } from './sfx';
 import { nightIn, tunnelNight } from './mitwachsen-dusk';
 import { plateToy } from './mitwachsen-plate-toy';
 import { postcard } from './mitwachsen-plate';
-import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
+import { StoryPlayer } from './mitwachsen-story';
+import { NOTE_COLORS } from './mitwachsen-stone-look';
 import { FriendLook, SIGHT_SPARKS, sightScore } from './mitwachsen-sight-look';
 import { marksOf, sightsOf } from './mitwachsen-sight';
 import {
@@ -1072,7 +1073,7 @@ class LarmicMitwachsen extends HTMLElement {
       // 3D-Welt, darüber die durchsichtige 2D-Ebene mit Zeichen, Pfeil, Nacht und Leiste
       this.r3d.render(this.world, this.state, scene);
       this.ctx.clearRect(0, 0, w, h);
-      this.renderer.overlay(this.world, this.state, scene, this.r3d.project);
+      this.renderer.overlay(this.world, this.state, scene, this.r3d.project, this.r3d.halos(), this.r3d.haloView());
     } else this.renderer.draw(this.world, this.state, scene);
     if (t - this.lastMap > 100) this.drawMiniMap(player, dpr, t); // Karte etwa zehnmal pro Sekunde
   }

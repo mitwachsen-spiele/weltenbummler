@@ -153,7 +153,7 @@ describe('Tiere der Höhlenwelt', () => {
 
   it('nur die Fledermaus hängt kopfüber: ihr Modell dazu hängt von z = 0 nach unten, Füße oben, Gesicht unten', () => {
     expect(IDS.filter((id) => CAVE_SPECIES[id].roost !== undefined)).toEqual(['fledermaus']);
-    for (const p of BAT_ROOST) expect(p[2] + p[5], String(p)).toBeLessThanOrEqual(1e-9);
+    for (const p of BAT_ROOST) expect(p[2] + p[5], JSON.stringify(p)).toBeLessThanOrEqual(1e-9);
     const top = Math.max(...BAT_ROOST.map((p) => p[2] + p[5]));
     expect(top).toBeCloseTo(0);
     const feet = BAT_ROOST.filter((p) => p[2] + p[5] > -1e-9).map((p) => p[6]);

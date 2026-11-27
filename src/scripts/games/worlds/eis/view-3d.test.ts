@@ -63,7 +63,11 @@ describe('3D-Teil des Welt-Pakets der Eis-Welt (view-3d.ts)', () => {
     const [x, y, crystal] = find('crystal');
     const boxes = drawDeco(view3d, world, crystal, x, y, at)!;
     expect(boxes.length).toBeGreaterThan(1);
-    expect(boxes.every((b) => b[8] === 'glow' && b[6] === crystal.color)).toBe(true);
+    const spikes = boxes.filter((b) => b[6] === crystal.color);
+    expect(spikes).toHaveLength(3);
+    expect(spikes.every((b) => b[8] === 'glow' && b[9]?.halo)).toBe(true); // leuchten und weich in den Raum
+    expect(boxes.every((b) => b[8] === 'glow')).toBe(true); // auch die Lichtkanten
+    expect(boxes.filter((b) => b[6] !== crystal.color).every((b) => b[6] === '#ffffff' && !b[9])).toBe(true);
     const cave: Cell = { ...crystal, biome: 'hoehle', region: 'wild', color: '#b48cf0' };
     expect(drawDeco(view3d, world, cave, x, y, at)).toBeNull();
   });
@@ -129,7 +133,7 @@ describe('3D-Teil des Welt-Pakets der Eis-Welt (view-3d.ts)', () => {
   });
 
   it('das Bett im Kessel ist aus Schnee, sonst sagt das Paket nichts (Holz)', () => {
-    expect(view3d.bedFrame!({ ...snow, deco: 'bed' })).toEqual([...ICE_COLORS.snow, 'white']);
+    expect(view3d.bedFrame!({ ...snow, deco: 'bed' })).toEqual([...ICE_COLORS.snow, 'schnee']);
     expect(view3d.bedFrame!({ ...snow, deco: 'bed', biome: undefined, region: 'lichtung' })).toBeNull();
   });
 });

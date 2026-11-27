@@ -7,7 +7,9 @@
 
 import { Group, Mesh, type BufferGeometry } from 'three';
 import type { GateId } from '../../data/games/mitwachsen';
-import { parts, type GateLook, type Parts } from './mitwachsen-gate-kit';
+import type { HaloAt } from '../../lib/games/front';
+import { partHalos, parts, type GateLook, type Parts } from './mitwachsen-gate-kit';
+import { placeHalos } from './mitwachsen-fine-bodies-3d';
 import { MovingGates } from './mitwachsen-gate-motion-3d';
 import { TURN_STEPS, gate, moves, openStep, plate } from './mitwachsen-gates-3d';
 import { ritualGlow } from './mitwachsen-guest-look';
@@ -30,7 +32,7 @@ type Turn = { front: GateId | null; far: boolean; amount: number; view: { yaw: n
 type Mode = number;
 /** Stufen eines Zugangs zwischen Fassung 1 und der Fassung zur Front */
 const stepsOf = (id: GateId) => TURN_STEPS[id] ?? 1;
-type House = { key: string; group: Group; beats?: Group };
+type House = { key: string; group: Group; beats?: Group; halos: (HaloAt & { id: string })[] };
 
 /**
  * Fassung zur Front für den Stand der Drehung (1 … `steps` + 1). Ohne Stufen (`steps` 1) wechselt das Schild bei halber
@@ -63,6 +65,11 @@ export class GateHouses {
     private plates: Pick<Plates3D, 'of'>,
     private look: (id: GateId) => GateLook | undefined,
   ) {}
+
+  /** Weiches Leuchten der gezeigten Torhäuser in der Welt (Glutkrone und Funken am Lavator), für den HaloPass */
+  halos(): (HaloAt & { id: string })[] {
+    return [...this.houses.values()].filter((h) => h.group.visible).flatMap((h) => h.halos);
+  }
 
   /** Alle Torhäuser im nächsten Bild neu (neue Welt, ein Welt-Paket oder sein 3D-Teil kam an) */
   reset() {
@@ -191,7 +198,9 @@ export class GateHouses {
       this.moving.wing(g.id, wing, w); // wackelt, wenn sein Tor „noch nicht“ zeigt
       house.add(wing);
     }
-    const h = { key, group: house, beats };
+    const at = { x: mx + 0.5, y: my + 0.5, z: world.cell(mx, my).h };
+    const halos = placeHalos(partHalos(p), at, house.rotation.y, 1, `gate:${g.id}`); // Fassungen gleich: gleiche Kennung
+    const h = { key, group: house, beats, halos };
     this.houses.set(g.id + mode, h);
     this.group.add(house);
     return h;

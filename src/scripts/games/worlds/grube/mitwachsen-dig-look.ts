@@ -75,7 +75,18 @@ export function laidParts(to: string): readonly Part[] | undefined {
   if (!shape) return undefined;
   const parts: Part[] = [
     BED_PART,
-    ...shape.map(([x, y, z, w, d, h, side, top]): Part => [y - 0.5, 0.5 - x - w, z + BED_H, d, w, h, side, top]),
+    ...shape.map(([x, y, z, w, d, h, side, top, fine]): Part => [
+      y - 0.5,
+      0.5 - x - w,
+      z + BED_H,
+      d,
+      w,
+      h,
+      side,
+      top,
+      undefined,
+      fine,
+    ]),
   ];
   beds.set(to, parts);
   return parts;
@@ -93,7 +104,7 @@ export function laidBodies(world: World, lane: readonly Point[], upto: number, p
     const [x, y] = lane[k]!;
     if (Math.max(Math.abs(x - player.x), Math.abs(y - player.y)) > DIG_SEEN) continue;
     const c = world.cell(x, y);
-    const at = { id: `${LAID_ID}:${k}`, x, y, z: c.h, dir: 's' as const };
+    const at = { id: `${LAID_ID}:${k}`, x, y, z: c.h, dir: 's' as const, foot: 0 }; // liegt flach: kein Fleck
     if (c.lane?.part === 'gang') {
       if (k % 2 === 0) out.push({ ...at, key: `${LAID_ID}:kruemel`, parts: CRUMB_PARTS });
       continue;

@@ -4,7 +4,8 @@
 // einfacher Block in Kartenfarbe. Gleich für 2D und die Ebene über 3D (dort nur Wetter und Leiste).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
-import { box, type Projection } from '../../lib/games/front';
+import { box, type Fine, type FinePainter, type Projection } from '../../lib/games/front';
+import { MARK_FRINGE, softMark } from '../../lib/games/shade';
 import type { GateId, RegionId, SpeciesId } from '../../data/games/mitwachsen';
 import type { HeraldEvent } from './mitwachsen-herald';
 import type { Deco } from './mitwachsen-cell';
@@ -22,9 +23,21 @@ import type { PlateLook } from './mitwachsen-plate';
 /**
  * Quader: x (rechts), y (nach vorn), z (Höhe), Breite, Tiefe, Höhe, Farbe der Seiten und oben, Art in 3D: `see` wird
  * vor der Figur durchsichtig (wie Laub und der Hut des Riesenpilzes), `sway` wiegt sich im Wind (wie die Grasbüschel),
- * `glow` leuchtet aus sich selbst, so hell, wie das Paket sagt (`View3D.glow`; Eiskristalle beim Polarlicht)
+ * `glow` leuchtet aus sich selbst, so hell, wie das Paket sagt (`View3D.glow`; Eiskristalle beim Polarlicht); zuletzt
+ * die Feinheit (`Fine`: Muster, Leuchten kompakter Teile), die erst ein feiner Maler zeigt
  */
-export type Box = readonly [number, number, number, number, number, number, string, string, ('see' | 'sway' | 'glow')?];
+export type Box = readonly [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  string,
+  string,
+  ('see' | 'sway' | 'glow')?,
+  Fine?,
+];
 
 /**
  * Töne zu einem Ereignis aus den Regeln einer Welt: Jedes geladene Paket wird gefragt und antwortet nur auf die
@@ -37,9 +50,34 @@ export const packScore = (views: Iterable<View2D>, e: PackEvent): Scored[] =>
 export const awayIn = (views: Iterable<View2D>, x: number, y: number, now: number) =>
   [...views].some((v) => v.away?.(x, y, now) ?? false);
 
-/** Einen Quader von vorn zeichnen (nichts, wenn keiner da ist) */
-export function drawBox(ctx: CanvasRenderingContext2D, P: Projection, b: Box | null | undefined) {
-  if (b) box(ctx, P, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
+/**
+ * Einen Quader von vorn zeichnen (nichts, wenn keiner da ist); `painter` wie bei `box` (undefined: der Maler des
+ * Kontexts, null: flach, etwa Böden)
+ */
+export function drawBox(
+  ctx: CanvasRenderingContext2D,
+  P: Projection,
+  b: Box | null | undefined,
+  painter?: FinePainter | null,
+) {
+  if (b) box(ctx, P, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[9], painter);
+}
+
+/**
+ * Flache Marke am Boden (Kufenspur, Schneefleck am Halt) mit weichem Rand (Entwurf „Feine Grafik“): zuerst der um den
+ * Saum gewachsene Quader halb durchsichtig (`softMark`, `MARK_FRINGE`), dann die Marke selbst, flach. Läuft sie über die
+ * ganze Länge eines Felds, bleibt diese Achse hart (sonst Lücken zwischen den Feldern)
+ */
+export function drawMark(ctx: CanvasRenderingContext2D, P: Projection, b: Box) {
+  const [x, y, z, w, d, h, side, top] = b;
+  const s = softMark(x, y, w, d);
+  if (s.w !== w || s.d !== d) {
+    const a = ctx.globalAlpha;
+    ctx.globalAlpha = a * MARK_FRINGE;
+    drawBox(ctx, P, [s.x, s.y, z, s.w, s.d, h, side, top], null);
+    ctx.globalAlpha = a;
+  }
+  drawBox(ctx, P, b, null);
 }
 
 /**
@@ -127,9 +165,37 @@ export function railsOrder(
   return c.gate ? { now: rails, later: [], deco: true } : { now: [], later: rails, deco: false };
 }
 
+/** Weicher Fleck am Boden unter einem Teil des Gleises: Mitte (x, y), Höhe des Bodens, Halbbreite */
+export type RailFoot = readonly [number, number, number, number];
+/**
+ * Weicher Fleck am Boden unter einem Ding eines Welt-Pakets (nur 2D; in 3D macht das die Sonne): Mitte (x, y), Höhe des
+ * Bodens, Halbbreite quer und tief (Felder). Er darf über mehrere Reihen reichen (Iglu): `FootSpots` in mitwachsen-fine-2d.ts
+ */
+export type Spot = readonly [number, number, number, number, number];
+/**
+ * Ab `low` steht ein Teil des Gleises (Prellbock, Pfeiler des Tunnelportals; Schwellen sind flacher), bis `long` ist es
+ * kompakt; unter `full` (Höhe des Prellbocks) wird sein Fleck mit der Höhe kleiner, so schrumpft er beim Versinken stetig
+ */
+const RAIL_STANDS = { low: 0.1, full: 0.45, long: 0.9 } as const;
+/**
+ * Wo das Gleis eines Felds einen weichen Fleck auf den Boden wirft (nur 2D; in 3D macht das die Sonne): unter jedem
+ * stehenden, kompakten Teil, das auf dem Boden steht (Prellbock, Pfeiler des Portals), nicht unter Schwellen, Schienen,
+ * dem Sturz oder den langen Wänden des Einschnitts; ein niedriges Teil (versinkender Prellbock, Bau 2) mit kleinerem Fleck
+ */
+export const railFeet = (c: Pick<Cell, 'h'>, boxes: readonly Box[]): RailFoot[] =>
+  boxes
+    .filter((b) => Math.abs(b[2] - c.h) < 1e-9 && b[5] >= RAIL_STANDS.low && Math.max(b[3], b[4]) <= RAIL_STANDS.long)
+    .map((b): RailFoot => [
+      b[0] + b[3] / 2,
+      b[1] + b[4] / 2,
+      c.h,
+      ((b[3] + b[4]) / 4) * Math.min(1, b[5] / RAIL_STANDS.full),
+    ]);
+
 /**
  * Gleis eines Felds mit Strecke (`Cell.ride`) in 2D zeichnen (`railsOrder`; `rails` fragt die Pakete, nur dort): gleich
- * oder in `later`; false, wenn das Feld sonst nichts mehr zeigt (liegt kein Gleis, true)
+ * oder in `later`; false, wenn das Feld sonst nichts mehr zeigt (liegt kein Gleis, true). `shadow` zeichnet vorher
+ * die weichen Flecken unter stehenden Teilen (`railFeet`)
  */
 export function placeRails(
   ctx: CanvasRenderingContext2D,
@@ -137,9 +203,11 @@ export function placeRails(
   c: Cell,
   rails: () => readonly Box[] | null | undefined,
   later: Box[],
+  shadow?: (foot: RailFoot) => void,
 ): boolean {
   const boxes = c.ride ? rails() : null;
   if (!boxes) return true;
+  if (shadow) for (const f of railFeet(c, boxes)) shadow(f);
   const order = railsOrder(c, boxes);
   for (const b of order.now) drawBox(ctx, P, b);
   later.push(...order.later);
@@ -155,6 +223,11 @@ export type View2D = {
    * `evening` golden-orange), sonst null
    */
   ground(c: Cell, x: number, y: number, open: boolean, evening?: number): Box | null;
+  /**
+   * Weicher Fleck unter einem Ding dieser Welt in 2D (Eis-Welt: Iglu, Fischkiste, Schneehaufen, Schale, Trog), sonst null.
+   * Die Grotte hat keinen: Ihre Dinge leuchten, der Kontrast bleibt (Regel „Farben der Grotte“)
+   */
+  foot?(world: World, c: Cell, x: number, y: number): Spot | null;
   /** Gleis auf Feldern mit Strecke (Paket der Bahn) */
   rails?: DrawRails;
   sky?: Sky;

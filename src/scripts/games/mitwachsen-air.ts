@@ -28,9 +28,9 @@ const HUDDLE: readonly SpeciesId[] = ['pinguin', 'moschusochse']; // diese Arten
 export function turnHead(parts: readonly Part[]): Part[] {
   const out: Part[] = [];
   for (const part of parts) {
-    const [f, r, z, fl, rw, h, color, top, face] = part;
+    const [f, r, z, fl, rw, h, color, top, face, fine] = part; // Feinheit (Muster, Leuchten) dreht sich mit
     if (z < HEAD_Z) out.push(part);
-    else if (face !== 'r') out.push([-(r + rw), f, z, rw, fl, h, color, top, face && (face === 'f' ? 'r' : 'f')]);
+    else if (face !== 'r') out.push([-(r + rw), f, z, rw, fl, h, color, top, face && (face === 'f' ? 'r' : 'f'), fine]);
   }
   return out;
 }

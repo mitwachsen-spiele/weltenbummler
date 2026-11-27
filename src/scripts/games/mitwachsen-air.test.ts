@@ -5,6 +5,7 @@ import { initialState, regionAnimals, type State } from './mitwachsen-state';
 import { BLOCK, gustOf, windy } from './mitwachsen-weather';
 import { IGLOO_LEDGE } from '../../data/games/mitwachsen-eis';
 import { worldOf } from './test-worlds';
+import type { Part } from '../../lib/games/front';
 
 const world = worldOf(1);
 const EIS = world.homes.eis;
@@ -35,10 +36,19 @@ describe('Kopf in die Böe drehen', () => {
     expect(turned).toHaveLength(body.length + head.filter((p) => p[8] !== 'r').length); // das rechte Auge zeigt nach hinten
     expect(turned.filter((p) => p[8] === 'r').length).toBe(head.filter((p) => p[8] === 'f').length);
     for (const p of turned.filter((p) => p[2] >= 0.74)) {
-      const orig = head.find((o) => o[2] === p[2] && o[3] === p[4] && o[4] === p[3] && o[1] === -(p[0] + p[3]));
-      expect(orig, String(p)).toBeDefined(); // um die Hochachse gedreht: vorn wird rechts
+      const orig = head.find(
+        (o) => o[2] === p[2] && o[3] === p[4] && o[4] === p[3] && Math.abs(o[1] + p[0] + p[3]) < 1e-9,
+      );
+      expect(orig, JSON.stringify(p)).toBeDefined(); // um die Hochachse gedreht: vorn wird rechts
       expect(p[1]).toBe(orig![0]);
     }
+  });
+  it('die Feinheit (Muster, Leuchten) dreht sich mit, auch an Gesichtsteilen', () => {
+    const fine = { skin: 'haar' as const, halo: true as const };
+    const parts = figureParts(LOOK).map((p): Part => [p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], fine]);
+    const turned = turnHead(parts);
+    expect(turned.filter((p) => p[2] >= 0.74).length).toBeGreaterThan(0);
+    for (const p of turned) expect(p[9]).toBe(fine);
   });
 });
 

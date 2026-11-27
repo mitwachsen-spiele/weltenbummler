@@ -5,7 +5,8 @@
 // wandern langsam über Tritte und Fälle nach unten. Beim Öffnen erkaltet die Glut von oben Stufe für Stufe zu dunklem
 // Stein mit glimmenden Fugen; dann sinken die Stufen zu einem flachen Basaltweg ab (anders als im Entwurf, wo man die
 // Treppe hinaufsteigt: Im Spiel läuft die Figur auf dem Gelände). Neben dem Gang steht ein großer Glutbaum als
-// Wahrzeichen (leuchtende Krone wie eine Laterne, nichts brennt), an ihm das Flammenzeichen als Schild zur Kamera.
+// Wahrzeichen (feines Modell, mitwachsen-gate-flora.ts: leuchtende Krone wie eine Laterne, nichts brennt), an ihm
+// das Flammenzeichen als Schild zur Kamera.
 // Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js).
 
 import {
@@ -14,12 +15,14 @@ import {
   ease,
   hash3,
   homeOf,
+  plantInto,
   seg,
   type GateBuild,
   type GateCtx,
   type GateMotion,
   type Part,
 } from './mitwachsen-gate-kit';
+import { glowTreeBoxes, type GlowTree } from './mitwachsen-gate-flora';
 import type { PlateLook } from './mitwachsen-plate';
 
 /* ---------- Farben ---------- */
@@ -35,8 +38,6 @@ const SAUM = ['#fff0b0', '#fff8dc'] as const; // wo die Lava über die Kante qui
 const CRUST = '#7a3018'; // Glut kurz vor dem Erkalten
 const FUGE = '#ff7a1a';
 const BAND = ['#ffe2a0', '#ffc066', '#ffa443'] as const; // Glutbänder: Mitte, halb, Rand
-const BARK = '#3b2a22';
-const BARK_TOP = '#4a3529';
 
 /** Farbe zwischen a und b (#rrggbb), t 0 … 1 */
 function mix(a: string, b: string, t: number) {
@@ -253,8 +254,8 @@ function column(b: Body, side: number, ci: number, r: number, hh: number) {
 const basalt = (b: Body) =>
   [-1, 1].forEach((side) => HEIGHT.forEach((rows, ci) => rows.forEach((h, r) => column(b, side, ci, r, h))));
 
-/* ---------- Glutbaum ---------- */
-type Tree = { x: number; z: number; y: number; h: number; k: number };
+/* ---------- Glutbaum (feines Modell: mitwachsen-gate-flora.ts) ---------- */
+type Tree = GlowTree;
 /**
  * Lage des Baums: neben dem Gang auf dem Säulenbasalt, auf Höhe des Teichs (Stamm bei |x| ≥ 3, die Krone erst ab
  * gut 4 Feldern Höhe). Ein Zugang sieht die Kamera in Ruhe aus der Richtung `cam` (`GateCtx.home`, meist von Süden):
@@ -269,51 +270,6 @@ export const treeAt = (cam: readonly [number, number]): Tree => ({
   h: 4.75,
   k: 1.4,
 });
-const CROWN = [
-  // dx, dz, dy, rx, rz, ry (wie im Entwurf, mal k)
-  [0, 0, 0.36, 0.66, 0.66, 0.48],
-  [0.06, -0.04, 0.86, 0.5, 0.5, 0.38],
-  [-0.03, 0.02, 1.22, 0.3, 0.3, 0.24],
-] as const;
-
-/** Stamm: dunkel, mit einem Glutriss im Zickzack auf allen vier Seiten (steht unten im Säulenbasalt) */
-function trunk(vox: Vox, t: Tree, lit: number) {
-  const [ci, ck, j0] = [Math.round(t.x * VOX), Math.round(t.z * VOX), Math.round(t.y * VOX)];
-  const b = new Body();
-  for (let j = j0; j < t.h * VOX; j++)
-    for (let i = ci - 2; i < ci + 2; i++) for (let k = ck - 2; k < ck + 2; k++) b.add(i, j, k, BARK, 'solid', BARK_TOP);
-  b.emit(vox);
-  const crack = mix('#c8601a', '#ff8a2a', lit);
-  for (let j = j0 + 2; j < t.h * VOX - 2; j++) {
-    const u = Math.floor(j / 5) % 2 ? -1 : 0; // Zickzack: welche Spalte der Seite
-    vox.set(ci + u, j, ck + 1, crack, 'bright');
-    vox.set(ci + u, j, ck - 2, crack, 'bright');
-    vox.set(ci - 2, j, ck + u, crack, 'bright');
-    vox.set(ci + 1, j, ck + u, crack, 'bright');
-  }
-}
-
-/** Krone aus drei runden Ballen, leuchtet von innen (heller, sobald der Weg frei ist) */
-function crown(vox: Vox, t: Tree, lit: number) {
-  const base = mix('#d9772e', '#ff9a3c', lit),
-    top = mix('#eea040', '#ffc24d', lit),
-    under = mix('#b8562a', '#d9702e', lit);
-  const b = new Body();
-  CROWN.forEach(([dx, dz, dy, rx, rz, ry], n) => {
-    const [cx, cy, cz] = [t.x + dx * t.k, t.h + dy * t.k, t.z + dz * t.k];
-    const [ax, ay, az] = [rx * t.k, ry * t.k, rz * t.k];
-    for (let j = Math.floor((cy - ay) * VOX); j <= Math.ceil((cy + ay) * VOX); j++)
-      for (let k = Math.floor((cz - az) * VOX); k <= Math.ceil((cz + az) * VOX); k++)
-        for (let i = Math.floor((cx - ax) * VOX); i <= Math.ceil((cx + ax) * VOX); i++) {
-          const [x, y, z] = [(i + 0.5) / VOX, (j + 0.5) / VOX, (k + 0.5) / VOX];
-          const d = ((x - cx) / ax) ** 2 + ((y - cy) / ay) ** 2 + ((z - cz) / az) ** 2;
-          if (d > 1 + (hash3(i, j, k) - 0.5) * 0.1) continue;
-          const c = n === 0 && y < cy - ay * 0.45 ? under : y > cy + ay * 0.3 ? top : base;
-          b.add(i, j, k, hash3(i, j, k + 31) < 0.08 ? '#ffe08a' : c, 'bright');
-        }
-  });
-  b.emit(vox);
-}
 
 /* ---------- Weltzeichen: Flamme auf runder Basaltplakette, schaut zur Kamera ---------- */
 const FLAME = [
@@ -348,16 +304,19 @@ export function voxels(g: GateCtx): Vox {
   basalt(b);
   b.emit(vox);
   saum(vox, f);
-  const lit = 0.75 + 0.25 * ease(seg(g.open, 0.7, 1));
-  const tree = treeAt(homeOf(g)); // der Baum bleibt, wo er aus der Ruhe-Kamera steht; nur sein Schild dreht
-  trunk(vox, tree, lit);
-  crown(vox, tree, lit);
-  sign(vox, tree, g.cam);
+  sign(vox, treeAt(homeOf(g)), g.cam); // der Baum bleibt, wo er aus der Ruhe-Kamera steht; nur sein Schild dreht
   return vox;
 }
 
+/** Wie hell der Glutbaum glüht: heller, sobald der Weg frei ist */
+export const treeLit = (open: number) => 0.75 + 0.25 * ease(seg(open, 0.7, 1));
+
 export const build: GateBuild = (p, g) => {
   voxels(g).emit(p);
+  // Glutbaum als feines Modell (mitwachsen-gate-flora.ts): Stamm mit Rinde, Krone leuchtet von innen
+  const tree = glowTreeBoxes(treeAt(homeOf(g)), treeLit(g.open));
+  plantInto(p, tree.solid);
+  plantInto(p, tree.bright, true);
   return [];
 };
 

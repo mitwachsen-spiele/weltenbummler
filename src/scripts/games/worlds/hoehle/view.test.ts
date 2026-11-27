@@ -5,7 +5,7 @@ import { ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave
 import type { Cell } from '../../mitwachsen-cell';
 import { drawDeco, type DecoAt, type Turn } from '../../mitwachsen-view';
 import { HOEHLE_PACK, worldOf } from '../../test-worlds';
-import { FALL_MS, SHED_H, band, caveBoxes, glowOver, waterfallBoxes } from './mitwachsen-cave-look';
+import { FALL_MS, SHED_H, band, caveBoxes, glowOver, lighten, waterfallBoxes } from './mitwachsen-cave-look';
 import { TURN_MS, view } from './view-2d';
 import { view3d } from './view-3d';
 import { openScore } from './mitwachsen-heave-look';
@@ -170,7 +170,7 @@ describe('Dinge der Kristallgrotte, gleich für 2D und 3D', () => {
     const side = caveBoxes(w, w.cell(sx - 1, sy), sx - 1, sy)!;
     const mid = caveBoxes(w, w.cell(sx, sy), sx, sy)!;
     expect(side.length).toBe(2);
-    expect(mid.length).toBe(5);
+    expect(mid.length).toBe(8); // Wand, Kristall, Dach mit Fuge vorn, zwei Pfosten aus Holz auf einem Steinfuß
     const roof = mid.find((b) => b[8] === 'see')!;
     expect(roof[2]).toBe(1 + SHED_H);
     expect(roof[0]).toBeLessThan(home.shelter.x0);
@@ -216,7 +216,8 @@ describe('Füllung der Grotte', () => {
     expect(top(mid)).toBeLessThan(1.4);
     expect(mid.length).toBeGreaterThan(edge.length);
     expect(top(mid)).toBeGreaterThan(top(edge));
-    expect(mid.every((b) => b[6] === color)).toBe(true);
+    // in seiner Farbe, der größte Splitter mit hellerer Spitze (fein)
+    expect(mid.every((b) => b[6] === color || b[6] === lighten(color, 0.45))).toBe(true);
     for (const note of [0, 1, 2, 3]) {
       const vein = caveBoxes(w, cell('vein', { solid: false, note, color: GROTTE_COLORS.veins[0] }), 3, 4)!;
       expect(top(vein), `Ader ${note}`).toBeLessThan(1.03);

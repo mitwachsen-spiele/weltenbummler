@@ -35,7 +35,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { CHUNK, chunkOf, fromKey, withNeighbours } from '../../lib/games/chunks';
-import type { Dir, Part, Projection } from '../../lib/games/front';
+import type { Dir, HaloAt, Part, Projection } from '../../lib/games/front';
 import {
   GAME_COLORS,
   GATES,
@@ -58,37 +58,43 @@ import type { Parts } from './mitwachsen-gatehouse';
 import { GateHouses } from './mitwachsen-gatehouses-3d';
 import { Platforms3D } from './mitwachsen-platform-3d';
 import { frontShot } from './mitwachsen-card-3d';
-import { fogMask } from './mitwachsen-fog-3d';
-import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
+import { fogMask, fogSeen } from './mitwachsen-fog-3d';
+import { riseOf, type HaloView } from './mitwachsen-halo';
+import { StoneNotes } from './mitwachsen-story-3d';
+import { stoneBoxes } from './mitwachsen-stone-look';
 import type { LoadedPack } from './mitwachsen-packs';
 import type { Scene } from './mitwachsen-render';
-import { SHEER } from './mitwachsen-ride-view';
+import { footOf, SHEER } from './mitwachsen-ride-view';
 import type { State } from './mitwachsen-state';
 import type { Cell, World } from './mitwachsen-world';
-import { PILZ_OVER, homeAt, openRoof } from './mitwachsen-home';
+import { homeAt, openRoof } from './mitwachsen-home';
 import { turnHead } from './mitwachsen-air';
 import { drawDeco, type DecoAt } from './mitwachsen-view';
 import { Views3D, type Air } from './mitwachsen-view-3d';
 import { DUSK_SKY, nightMix, sunLevel, type Rgb } from './mitwachsen-dusk';
-import { tree, tufts } from './mitwachsen-trees-3d';
+import { tufts } from './mitwachsen-trees-3d';
+import { decoBoxes } from './mitwachsen-deco-look';
+import { SIGN_TOP, WOOD_BED, bedBoxes, signBoxes, sleeperBoxes } from './mitwachsen-yard-look';
 import { stoneOf } from './mitwachsen-waystone';
 import { waystoneBoxes } from './mitwachsen-waystone-look';
 import type { PlateTurn } from './mitwachsen-turn-3d';
-import { CAM_REST, camPose } from './mitwachsen-camera';
+import { CAM_REST, camPose, type CamView } from './mitwachsen-camera';
 import { hangAt } from './mitwachsen-roost';
 import { workOf } from './mitwachsen-herald';
+import { composeShader, skinTexture, type Compose } from './mitwachsen-fine-3d';
+import { Contacts, placeHalos, type Contact } from './mitwachsen-fine-bodies-3d';
+import {
+  chunkHalos,
+  fineBox,
+  fineBoxes,
+  fineSinks,
+  groundCorners,
+  groundHeight,
+  heightGrid,
+  sinkOf,
+  type FineSinks,
+} from './mitwachsen-fine-chunk-3d';
 
-/** Beeren am Busch: [x, Höhe, z] im Feld; oben auf der Kuppe und an der Vorderseite (zur Kamera) */
-const BERRIES = [
-  [0.3, 0.66, 0.34],
-  [0.56, 0.66, 0.5],
-  [0.42, 0.66, 0.62],
-  [0.2, 0.3, 0.85],
-  [0.5, 0.18, 0.85],
-  [0.72, 0.34, 0.85],
-  [0.05, 0.22, 0.5],
-  [0.88, 0.26, 0.4],
-] as const;
 const SUN_OFFSET = new Vector3(-9, 22, 7); // Sonne von links oben vorn, vom Ziel aus (dreht mit der Kamera)
 const UP = new Vector3(0, 1, 0);
 const NEAR_GATE = 14; // so nah (Felder, waagrecht und senkrecht) an einem Tor lädt die Drehung zur Torfront nach
@@ -97,11 +103,16 @@ const RADIUS = 2; // Stücke um die Figur, die als Mesh vorliegen (5 × 5 = 80 �
 const BUILD_PER_FRAME = 2; // neue Stücke je Bild, damit nichts ruckelt
 const FOG_N = 128; // Nebel-Maske: 128 × 128 Felder um die Figur (8 × 8 Stücke)
 
-/** Modell aus Teilen (wie in der 2D-Ansicht), mit Blick nach Osten (+x): vorn → x, rechts → z, oben → y */
-function modelGeometry(parts: readonly Part[]): BufferGeometry {
+type Model = { geo: BufferGeometry; halos: readonly HaloAt[] };
+/**
+ * Modell aus Teilen (wie in der 2D-Ansicht), mit Blick nach Osten (+x): vorn → x, rechts → z, oben → y; jedes Teil fein
+ * (Verlauf, Kante, Muster), gezeigt in Größe `scale`
+ */
+function modelGeometry(parts: readonly Part[], scale = 1): Model {
   const g = new Geo();
-  for (const [f, r, z, fl, rw, h, color, top] of parts) g.box(f, z, r, fl, h, rw, color, top ?? null, 'fur');
-  return g.build();
+  for (const [f, r, z, fl, rw, h, color, top, , fine] of parts)
+    g.box(f, z, r, fl, h, rw, color, top ?? null, 'fur', undefined, fine ?? {}, scale);
+  return { geo: g.build(), halos: g.halos };
 }
 const YAW: Record<Dir, number> = { e: 0, s: -Math.PI / 2, w: Math.PI, n: Math.PI / 2 };
 
@@ -124,14 +135,13 @@ const GROUND_TILES: Record<Exclude<Cell['ground'], 'water' | 'lava' | 'sky'>, [T
 /** Kacheln der Hecke am Rand der Lichtung (`Cell.rim`) */
 const HEDGE_TILES: [Tile, Tile, Tile] = ['leaves', 'leaves', 'leaves'];
 /** Rahmen des Betts: aus Holz (Seite, oben, Kachel); in einer Welt hinter einem Tor sagt es ihr Paket */
-const WOOD_FRAME: readonly [string, string | null, Tile] = [GAME_COLORS.bed.frame, null, 'planks'];
 const SKY = new Color('#9fd6f0');
 const NIGHT_SKY = new Color('#141a3a');
 const CLOUD_SKY = new Color('#a9b4bf'); // Himmel bei Wolken und Regen
 const DUSK = new Color(DUSK_SKY); // Himmel der Lichtung in der Dämmerung (Tageslicht 0,4): so dunkel höchstens die Grotte
 const HEMI_SKY = '#cfe9ff'; // Himmelslicht von oben
 
-type Chunk = { meshes: Mesh[] };
+type Chunk = { meshes: Mesh[]; halos: (HaloAt & { id: string })[] };
 export class World3D {
   private renderer: WebGLRenderer;
   private scene = new ThreeScene();
@@ -163,7 +173,15 @@ export class World3D {
   };
   private fogDirty = true;
   private fogKey = '';
-  private entity = new MeshLambertMaterial({ vertexColors: true });
+  private fogAt: readonly [number, number] = [0, 0]; // Ursprung der Nebel-Maske (Feld des Texels 0)
+  private cam: CamView = CAM_REST; // Blick der Kamera in diesem Bild (dreht auf einer Torplatte)
+  private entity = new MeshLambertMaterial({ vertexColors: true }); // Wesen: fein (Muster, Verlauf, Kante)
+  private skins = skinTexture(); // Muster der feinen Dinge (mitwachsen-fine-3d.ts)
+  private fineSolid!: MeshLambertMaterial; // feine Dinge der Stücke (Deko, Bäume, Gleis, Dinge der Pakete)
+  private fineCanopy!: MeshLambertMaterial; // ihr Laub: vor der Figur durchsichtig
+  private contacts = new Contacts(); // weicher Fleck unter den Körpern
+  private bodyHalos: (HaloAt & { id: string })[] = []; // Leuchten an Modellen (Laterne in der Hand) in diesem Bild
+  private heights: ((x: number, y: number) => number | null) | null = null; // Höhen des Stücks im Bau (Boden-Schatten)
   private sheer = new MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: SHEER, depthWrite: false }); // Dachplatte über der Figur (`RideBody.sheer`)
   private dark = new MeshLambertMaterial({ color: GAME_COLORS.silhouette }); // verlorene Tiere auf den Tafeln
   private lava!: MeshLambertMaterial; // leuchtet auch nachts
@@ -187,7 +205,7 @@ export class World3D {
   private opened: readonly GateId[] = []; // offene Tore: danach glänzt z. B. die Rutschspur zum Schneebett
   private views = new Views3D(); // 3D-Teile der Welt-Pakete, sobald geladen
   private houses!: GateHouses; // Torhäuser samt bewegten Teilen, je Tor neu gebaut, wenn sich dort etwas ändert
-  private models = new Map<string, BufferGeometry>();
+  private models = new Map<string, Model>();
   private bodies = new Map<string, Mesh>();
   private signs = new Group();
   private signKey = '';
@@ -220,18 +238,25 @@ export class World3D {
     this.gateSolid = new MeshLambertMaterial({ map: tex, vertexColors: true });
     this.bright = new MeshBasicMaterial({ map: tex, vertexColors: true });
     this.glow = new MeshBasicMaterial({ map: tex, vertexColors: true });
+    this.fineSolid = new MeshLambertMaterial({ map: tex, vertexColors: true });
+    this.fineCanopy = new MeshLambertMaterial({ map: tex, vertexColors: true });
     this.fogTex.magFilter = LinearFilter;
     this.fogTex.minFilter = LinearFilter;
-    for (const m of [this.solid, this.water, this.lava, this.bright, this.glow]) this.withFog(m, false);
-    this.withFog(this.foliage, false, true);
-    this.withFog(this.canopy, true);
-    this.withFog(this.gateSolid, true);
+    for (const m of [this.solid, this.water, this.lava, this.glow]) this.withFog(m, {});
+    this.withFog(this.foliage, { sway: true });
+    this.withFog(this.canopy, { see: true });
+    this.withFog(this.gateSolid, { see: true });
+    this.withFog(this.bright, { fine: true }); // Kristalle sind fein, Zeichen und Wasserfälle der Tore nicht
+    this.withFog(this.fineSolid, { fine: true });
+    this.withFog(this.fineCanopy, { see: true, fine: true });
+    for (const m of [this.entity, this.sheer, this.notes.material])
+      composeShader(m, this.fogUniforms, this.skins, { fine: true });
     this.platforms = new Platforms3D(this.gateSolid, this.bright, () => {
       const m = new MeshBasicMaterial({ map: tex, vertexColors: true });
-      this.withFog(m, false);
+      this.withFog(m, {});
       return m;
     });
-    this.scene.add(this.platforms.group);
+    this.scene.add(this.platforms.group, this.contacts.mesh);
     this.houses = new GateHouses(
       (p) => this.meshes(p),
       this.platforms.plates,
@@ -249,59 +274,11 @@ export class World3D {
   }
 
   /**
-   * Shader-Zusatz für die Welt:
-   * – Nebel: Farbe nach der Beleuchtung je nach Nebel-Maske in die Himmelsfarbe mischen.
-   * – Durchblick (nur Laub: Baumkronen, Büsche, Hecken): Nah an der Sichtlinie Kamera → Figur, vor der Figur und auf
-   *   Körperhöhe oder darüber werden Pixel im 2 × 2-Muster weggelassen, bis zu drei von vier, zum Rand hin immer
-   *   weniger. So sieht man die Figur zwischen vielen Bäumen. Boden und Felsen bleiben fest (unter ihrer Oberfläche
-   *   ist nichts, ein Loch zeigte den Himmel).
+   * Shader-Zusatz für die Welt (mitwachsen-fine-3d.ts): Nebel-Maske immer; Durchblick (`see`: Laub, Mauerwerk der Tore)
+   * vor der Figur und unter dem offenen Dach; Wind (`sway`: Grasbüschel); Muster und Kante feiner Dinge (`fine`)
    */
-  private withFog(material: MeshLambertMaterial | MeshBasicMaterial, seeThrough: boolean, sway = false) {
-    material.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, this.fogUniforms);
-      // Wind (nur Grasbüschel): Spitzen schwingen seitlich, der Fuß bleibt stehen (Höhe über dem Boden = fract(y))
-      const swayCode = sway
-        ? '\n  float mwUp = fract(transformed.y);\n' +
-          '  transformed.x += sin(mwTime * 2.3 + transformed.x * 1.7 + transformed.z * 1.3) * mwWind * mwUp * 0.6;\n' +
-          '  transformed.z += cos(mwTime * 1.9 + transformed.x * 1.1) * mwWind * mwUp * 0.25;'
-        : '';
-      shader.vertexShader =
-        'varying vec3 vMwWorld;\nuniform float mwTime;\nuniform float mwWind;\n' +
-        shader.vertexShader.replace(
-          '#include <begin_vertex>',
-          '#include <begin_vertex>' + swayCode + '\n  vMwWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;',
-        );
-      shader.fragmentShader =
-        'uniform sampler2D mwFogMap;\nuniform vec2 mwFogOrigin;\nuniform float mwFogSize;\nuniform vec3 mwFogTint;\n' +
-        'uniform vec3 mwEye;\nuniform vec3 mwTarget;\nuniform vec4 mwRoof;\nvarying vec3 vMwWorld;\n' +
-        shader.fragmentShader
-          .replace(
-            '#include <clipping_planes_fragment>',
-            !seeThrough
-              ? '#include <clipping_planes_fragment>'
-              : '#include <clipping_planes_fragment>\n' +
-                  '  vec3 mwDir = normalize(mwTarget - mwEye);\n' +
-                  '  float mwLen = distance(mwTarget, mwEye);\n' +
-                  '  float mwT = dot(vMwWorld - mwEye, mwDir);\n' +
-                  '  float mwD = distance(vMwWorld, mwEye + mwDir * mwT);\n' +
-                  '  float mwBayer = (mod(floor(gl_FragCoord.x), 2.0) * 2.0 + mod(floor(gl_FragCoord.y), 2.0)) / 4.0;\n' +
-                  '  if (mwT < mwLen - 0.8 && vMwWorld.y > mwTarget.y - 0.7) {\n' +
-                  '    float mwCut = 0.75 * smoothstep(1.7, 0.9, mwD);\n' +
-                  '    if (mwBayer < mwCut) discard;\n' +
-                  '  }\n' +
-                  '  if (distance(vMwWorld.xz, mwRoof.xy) < mwRoof.z && vMwWorld.y > mwTarget.y + 0.3) {\n' +
-                  '    float mwChk = mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0);\n' +
-                  '    if (mwRoof.w > 0.5 ? mwChk < 0.5 : (mwRoof.w > 0.0 && mwBayer < 0.25)) discard;\n' +
-                  '  }',
-          )
-          .replace(
-            '#include <tonemapping_fragment>',
-            'float mwSeen = texture2D(mwFogMap, (vMwWorld.xz - mwFogOrigin) / mwFogSize).r;\n' +
-              '  gl_FragColor.rgb = mix(mwFogTint, gl_FragColor.rgb, smoothstep(0.08, 0.92, mwSeen));\n' +
-              '#include <tonemapping_fragment>',
-          );
-    };
-    material.customProgramCacheKey = () => (seeThrough ? 'mw-fog-see' : sway ? 'mw-fog-sway' : 'mw-fog');
+  private withFog(material: MeshLambertMaterial | MeshBasicMaterial, c: Compose) {
+    composeShader(material, this.fogUniforms, this.skins, { fog: true, ...c });
   }
 
   /** Nebel-Maske neu berechnen: erkundet = 1, dann zweimal weich verwischt (sanfter Übergang über 2–3 Felder) */
@@ -314,6 +291,7 @@ export class World3D {
     this.fogDirty = false;
     this.fogKey = key;
     this.fogData.set(fogMask(this.explored, ox, oy, FOG_N));
+    this.fogAt = [ox, oy];
     this.fogTex.needsUpdate = true;
     // Texel i liegt mittig auf Feld ox + i: Ursprung so, dass (x + 0,5 − ox) / N die Texelmitte trifft
     this.fogUniforms.mwFogOrigin.value.set(ox, oy);
@@ -333,11 +311,15 @@ export class World3D {
     this.scene.traverse((o) => {
       if (o instanceof Mesh) (o.geometry as BufferGeometry).dispose(); // Stücke, Tore, Schläfer, Tafeln, Wesen; doppeltes dispose schadet nicht
     });
-    for (const g of this.models.values()) g.dispose();
+    for (const m of this.models.values()) m.geo.dispose();
     this.models.clear();
     this.solid.map?.dispose();
+    this.skins.dispose();
+    this.contacts.dispose();
     for (const m of [this.solid, this.foliage, this.water, this.lava, this.canopy, this.entity, this.sheer, this.dark])
       m.dispose();
+    this.fineSolid.dispose();
+    this.fineCanopy.dispose();
     this.fogTex.dispose();
     this.sun.shadow.dispose();
     this.renderer.dispose();
@@ -353,6 +335,20 @@ export class World3D {
     v.applyMatrix4(this.camera.projectionMatrix);
     return [((v.x + 1) / 2) * this.size.w, ((1 - v.y) / 2) * this.size.h];
   };
+
+  /** Leuchten kompakter Teile in diesem Bild (Stücke um die Figur, Modelle), für den Durchgang auf der Ebene darüber */
+  halos(): (HaloAt & { id: string })[] {
+    const chunks = [...this.chunks.values()].flatMap((c) => c.halos);
+    return [...chunks, ...this.bodyHalos, ...this.notes.halos, ...this.houses.halos()]; // samt Glutkrone am Lavator
+  }
+
+  /** Blick der Kamera und Nebelrand für das Leuchten auf der Ebene darüber (mitwachsen-halo.ts) */
+  haloView(): HaloView {
+    const yaw = (this.cam.yaw * Math.PI) / 180; // Kamera in Richtung (sin ψ, cos ψ) vom Blickpunkt (camPose)
+    const [ox, oy] = this.fogAt;
+    const seen = (x: number, y: number) => fogSeen(this.fogData, ox, oy, FOG_N, x, y);
+    return { rise: riseOf(this.cam.tilt), to: [Math.sin(yaw), Math.cos(yaw)], seen };
+  }
 
   render(world: World, state: State, sc: Scene) {
     const t0 = performance.now();
@@ -377,7 +373,7 @@ export class World3D {
     // Torplatte dreht die Kamera zur Front, neigt sich, rückt heran und schaut etwas höher (bei p = 0 wie immer)
     const k = Math.min(1.8, Math.max(1, 0.95 / this.camera.aspect));
     this.wantTurn(world, cam, sc.reduced);
-    const view = this.turn?.frame(world, state, sc) ?? CAM_REST;
+    const view = (this.cam = this.turn?.frame(world, state, sc) ?? CAM_REST);
     const { eye, look, dist } = camPose([tx, ty, tz], view, k, this.turn?.to ?? [0, 0]);
     const fog = this.scene.fog as Fog;
     fog.near = dist + 8;
@@ -549,10 +545,12 @@ export class World3D {
       [p.lava, this.lava],
       [p.bright, this.bright],
       [p.leaves, this.canopy],
+      [p.plant, this.fineCanopy], // Pflanzen im Torhaus fein (Palmen, Glutbaum, Tannen, Riesenpilze)
+      [p.plantTiny, this.fineCanopy], // … ihre winzigen Teile, ohne Schattenwurf
     ] as const) {
       if (g.empty) continue;
       const m = new Mesh(g.build(), mat);
-      m.castShadow = mat !== this.bright;
+      m.castShadow = mat !== this.bright && g !== p.plantTiny;
       m.receiveShadow = true;
       out.push(m);
     }
@@ -616,16 +614,18 @@ export class World3D {
 
   private buildChunk(world: World, cx: number, cy: number): Chunk {
     const geo = () => new Geo();
-    const [solid, leaves, canopy, water, lava, bright, glow] = [geo(), geo(), geo(), geo(), geo(), geo(), geo()];
+    const [solid, leaves, water, lava, bright, glow] = [geo(), geo(), geo(), geo(), geo(), geo()];
+    const fine = fineSinks(); // Dinge: fein, getrennt vom Gelände (mitwachsen-fine-chunk-3d.ts)
+    this.heights = heightGrid((x, y) => world.cell(x, y), cx * CHUNK, cy * CHUNK, CHUNK); // für den Schatten am Boden
     for (let y = cy * CHUNK; y < (cy + 1) * CHUNK; y++)
       for (let x = cx * CHUNK; x < (cx + 1) * CHUNK; x++) {
         const c = grown(world.seed, this.day, x, y, world.cell(x, y)); // mit allem, was schon nachgewachsen ist
-        this.terrain(solid, water, lava, world, c, x, y);
+        this.terrain(solid, water, lava, world, c, x, y, fine);
         // Gleis (3D-Teil der Bahn): Schwellen, Schienen, Prellbock, Portal; dort keine Büschel und Blumen
         const rails = c.ride ? this.views.rails(c, x, y, this.at) : null;
-        for (const [bx, by, bz, w, d, bh, side, top] of rails ?? []) solid.box(bx, bz, by, w, bh, d, side, top);
-        if (!rails && !this.packed({ g: solid, blades: leaves, canopy, glow }, c, x, y))
-          this.decoration(solid, leaves, canopy, bright, c, x, y);
+        if (rails) fineBoxes(fine, rails);
+        if (!rails && !this.packed({ fine, blades: leaves, glow }, c, x, y))
+          this.decoration(leaves, bright, fine, c, x, y);
       }
     const meshes: Mesh[] = [];
     const add = (g: Geo, mat: MeshLambertMaterial | MeshBasicMaterial, shadows: boolean) => {
@@ -637,16 +637,18 @@ export class World3D {
       meshes.push(m);
     };
     add(solid, this.solid, true);
-    add(canopy, this.canopy, true);
+    add(fine.solid, this.fineSolid, true);
+    add(fine.see, this.fineCanopy, true);
+    add(fine.tiny, this.fineSolid, false); // winzige Teile ohne Schattenwurf
     add(leaves, this.foliage, false);
     add(water, this.water, false);
     add(lava, this.lava, false);
     add(bright, this.bright, false);
     add(glow, this.glow, false);
-    return { meshes };
+    return { meshes, halos: chunkHalos(`${cx},${cy}`, [fine.solid, fine.see, fine.tiny, bright, glow]) };
   }
 
-  private terrain(g: Geo, water: Geo, lava: Geo, world: World, c: Cell, x: number, y: number) {
+  private terrain(g: Geo, water: Geo, lava: Geo, world: World, c: Cell, x: number, y: number, fine?: FineSinks) {
     // Unter Wolken ist nichts: Ihre Seiten reichen weit hinunter, damit sie über dem Himmel schweben
     const heightOf = (n: Cell) => (n.ground === 'sky' ? -4 : n.ground === 'water' || n.ground === 'lava' ? 0 : n.h);
     if (c.ground === 'sky') return;
@@ -674,10 +676,6 @@ export class World3D {
         'white',
         new Color(this.views.water(c) ?? GAME_COLORS.water),
       );
-      if (c.deco === 'lily') {
-        g.box(x + 0.25, 0.83, y + 0.3, 0.5, 0.03, 0.4, '#4f9a3c', '#6dbd47');
-        g.box(x + 0.45, 0.86, y + 0.42, 0.12, 0.06, 0.12, '#e77fb3');
-      }
       return;
     }
     const h = c.h;
@@ -695,7 +693,9 @@ export class World3D {
     if (c.tint && c.ground === 'grass') tint.multiply(new Color(c.tint)); // Stimmung der Richtung
     const top = own?.top ? new Color(own.top) : tint.clone();
     if (own?.light) top.multiplyScalar(1 + own.light); // Lichtfleck (Grotte): Licht in den Farben der Ecken
-    g.quad([x, h, y + 1], [x + 1, h, y + 1], [x + 1, h, y], [x, h, y], [0, 1, 0], topTile, top);
+    // weicher Schatten neben höheren Blöcken: nur die Farbe der Ecken, Kachel und Form bleiben
+    const corners = groundCorners(this.heights ?? ((nx, ny) => groundHeight(world.cell(nx, ny))), x, y);
+    g.quad([x, h, y + 1], [x + 1, h, y + 1], [x + 1, h, y], [x, h, y], [0, 1, 0], topTile, top, corners);
     const sides: [number, number, V3][] = [
       [0, 1, [0, 0, 1]],
       [0, -1, [0, 0, -1]],
@@ -717,8 +717,9 @@ export class World3D {
     if (c.rim) for (const [bx, by, bz, w, d, bh, color] of rimBlossoms(x, y, h)) g.box(bx, bz, by, w, bh, d, color);
     const way = stoneOf(c); // Wegstein neben einem Weltpfad: wach, sobald sein Tor offen ist
     if (way)
-      for (const [bx, by, bz, w, d, bh, side, top] of waystoneBoxes(x, y, h, way, this.opened.includes(way)))
-        g.box(bx, bz, by, w, bh, d, side, top);
+      for (const b of waystoneBoxes(x, y, h, way, this.opened.includes(way)))
+        if (fine) fineBox(sinkOf(fine, b), b);
+        else g.box(b[0], b[2], b[1], b[3], b[5], b[4], b[6], b[7]);
   }
 
   /**
@@ -727,208 +728,50 @@ export class World3D {
    * Wind wie die Grasbüschel, Eiskristalle leuchten beim Polarlicht); solange er lädt, ein einfacher Block. false: kein
    * solches Ding, wie sonst bauen.
    */
-  private packed(geo: Record<'g' | 'blades' | 'canopy' | 'glow', Geo>, c: Cell, x: number, y: number): boolean {
+  private packed(geo: { fine: FineSinks; blades: Geo; glow: Geo }, c: Cell, x: number, y: number): boolean {
     const boxes = drawDeco(this.views.decos, this.world!, c, x, y, this.at);
-    const into = { see: geo.canopy, sway: geo.blades, glow: geo.glow } as const;
-    for (const [bx, by, bz, w, d, bh, side, top, kind] of boxes ?? [])
-      (kind ? into[kind] : geo.g).box(bx, bz, by, w, bh, d, side, top);
+    for (const b of boxes ?? []) {
+      const [bx, by, bz, w, d, bh, side, top, kind, how] = b;
+      if (kind === 'sway') geo.blades.box(bx, bz, by, w, bh, d, side, top);
+      else if (kind === 'glow')
+        geo.glow.box(bx, bz, by, w, bh, d, side, top, 'white', undefined, how); // Eiskristall: leuchtet, dazu `halo`
+      else fineBox(sinkOf(geo.fine, b), b); // Dinge der Welt fein, Laub vor der Figur durchsichtig
+    }
     return !!boxes;
   }
 
-  private decoration(g: Geo, blades: Geo, canopy: Geo, bright: Geo, c: Cell, x: number, y: number) {
+  /**
+   * Dinge auf einem Feld aus derselben Quelle wie 2D (mitwachsen-deco-look.ts): Laub (`see`) vor der Figur durchsichtig,
+   * Kristalle leuchten aus sich selbst; Bett, Tafel und Klangstein (mitwachsen-stone-look.ts) aus ihren eigenen Quadern
+   */
+  private decoration(blades: Geo, bright: Geo, fine: FineSinks, c: Cell, x: number, y: number) {
     const h = c.h;
     if (c.tufts) tufts(blades, x, y, h, c.tufts);
     switch (c.deco) {
-      case 'tree':
-        tree(g, canopy, x, y, h, c.tree ?? 'oak');
-        break;
-      case 'bush':
-        // Beerenbusch: niedrig und rund (zwei Stufen), rote Beeren oben und vorn – kein Baumwipfel
-        canopy.box(x + 0.08, h, y + 0.12, 0.84, 0.5, 0.76, '#3f9a3c', '#5ab651', 'leaves');
-        canopy.box(x + 0.2, h + 0.5, y + 0.22, 0.6, 0.16, 0.56, '#3f9a3c', '#5ab651', 'leaves');
-        if (!(`${x},${y}` in this.at.picked))
-          for (const [bx, by, bz] of BERRIES) g.box(x + bx, h + by, y + bz, 0.09, 0.09, 0.09, '#c8323a', '#ef5b5b');
-        break;
-      case 'flower':
-        g.box(x + 0.47, h, y + 0.47, 0.06, 0.18, 0.06, '#3f9a3c');
-        g.box(x + 0.4, h + 0.18, y + 0.4, 0.2, 0.1, 0.2, c.color ?? '#ffffff', '#f2d14b');
-        break;
-      case 'fern':
-        for (const [fx, fz, fh] of [
-          [0.3, 0.45, 0.34],
-          [0.5, 0.36, 0.42],
-          [0.62, 0.52, 0.3],
-          [0.42, 0.6, 0.28],
-        ] as const)
-          g.box(x + fx - 0.05, h, y + fz, 0.1, fh, 0.08, '#3c8a34', '#58a73a');
-        break;
-      case 'boulder':
-        g.box(x + 0.14, h, y + 0.2, 0.72, 0.42, 0.6, '#8a8f96', '#9aa0a7', 'stone');
-        g.box(x + 0.26, h + 0.42, y + 0.28, 0.46, 0.16, 0.38, '#8f949b', '#6dbd47', 'stone');
-        break;
-      case 'mushroom':
-        g.box(x + 0.44, h, y + 0.46, 0.1, 0.16, 0.1, '#f3efe6');
-        g.box(x + 0.33, h + 0.16, y + 0.35, 0.32, 0.12, 0.32, '#d9473a', '#e0574a');
-        break;
-      case 'reed':
-        g.box(x + 0.3, h, y + 0.5, 0.06, 0.55, 0.06, '#5f8f3a');
-        g.box(x + 0.6, h, y + 0.3, 0.06, 0.66, 0.06, '#5f8f3a');
-        g.box(x + 0.59, h + 0.66, y + 0.29, 0.08, 0.16, 0.08, '#7a5432');
-        break;
-      case 'fence':
-        this.fence(g, x, y, h);
-        break;
-      case 'cactus':
-        g.box(x + 0.37, h, y + 0.37, 0.26, 1.35, 0.26, '#3f8f3a', '#5aab4a');
-        g.box(x + 0.13, h + 0.55, y + 0.42, 0.24, 0.16, 0.16, '#3f8f3a', '#5aab4a');
-        g.box(x + 0.13, h + 0.55, y + 0.42, 0.14, 0.55, 0.16, '#3f8f3a', '#5aab4a');
-        g.box(x + 0.63, h + 0.8, y + 0.42, 0.24, 0.16, 0.16, '#3f8f3a', '#5aab4a');
-        g.box(x + 0.73, h + 0.8, y + 0.42, 0.14, 0.45, 0.16, '#3f8f3a', '#5aab4a');
-        g.box(x + 0.44, h + 1.35, y + 0.44, 0.12, 0.1, 0.12, '#f08cc8'); // Blüte
-        break;
-      case 'crystal': {
-        const cc = c.color ?? '#b48cf0';
-        bright.box(x + 0.36, h, y + 0.36, 0.28, 1.15, 0.28, cc);
-        bright.box(x + 0.14, h, y + 0.5, 0.2, 0.7, 0.2, cc);
-        bright.box(x + 0.62, h, y + 0.22, 0.18, 0.55, 0.18, cc);
-        break;
-      }
-      case 'stalagmite':
-        g.box(x + 0.22, h, y + 0.22, 0.56, 0.5, 0.56, '#ffffff', null, 'cave');
-        g.box(x + 0.32, h + 0.5, y + 0.32, 0.36, 0.5, 0.36, '#ffffff', null, 'cave');
-        g.box(x + 0.41, h + 1.0, y + 0.41, 0.18, 0.45, 0.18, '#ffffff', null, 'cave');
-        break;
-      case 'bigshroom': {
-        const cap = c.color ?? '#d9473a';
-        g.box(x + 0.36, h, y + 0.36, 0.28, 1.4, 0.28, '#efe4d2', '#f7efe2');
-        canopy.box(x - 0.25, h + 1.4, y - 0.25, 1.5, 0.45, 1.5, cap, cap);
-        canopy.box(x + 0.05, h + 1.85, y + 0.05, 0.9, 0.25, 0.9, cap, cap);
-        for (const [dx, dz] of [
-          [0.1, 0.2],
-          [0.75, 0.55],
-          [0.3, 0.85],
-          [0.95, 0.05],
-        ] as const)
-          canopy.box(x + dx - 0.15, h + 1.86, y + dz - 0.15, 0.2, 0.05, 0.2, '#ffffff');
-        break;
-      }
-      case 'trough':
-      case 'watertrough': {
-        // Trog aus Holz auf vier Füßchen: Futter (Heu und Möhren) oder Wasser
-        for (const [fx, fz] of [
-          [0.1, 0.2],
-          [0.8, 0.2],
-          [0.1, 0.72],
-          [0.8, 0.72],
-        ] as const)
-          g.box(x + fx, h, y + fz, 0.1, 0.12, 0.1, '#7a5432');
-        g.box(x + 0.05, h + 0.12, y + 0.15, 0.9, 0.08, 0.72, '#8a5a30', '#a0703f', 'planks');
-        g.box(x + 0.05, h + 0.2, y + 0.15, 0.9, 0.28, 0.08, '#8a5a30', '#a0703f', 'planks');
-        g.box(x + 0.05, h + 0.2, y + 0.79, 0.9, 0.28, 0.08, '#8a5a30', '#a0703f', 'planks');
-        g.box(x + 0.05, h + 0.2, y + 0.23, 0.08, 0.28, 0.56, '#8a5a30', '#a0703f', 'planks');
-        g.box(x + 0.87, h + 0.2, y + 0.23, 0.08, 0.28, 0.56, '#8a5a30', '#a0703f', 'planks');
-        if (c.deco === 'watertrough') g.box(x + 0.13, h + 0.2, y + 0.23, 0.74, 0.22, 0.56, '#3f8fd8', '#7fc0f0');
-        else {
-          g.box(x + 0.13, h + 0.2, y + 0.23, 0.74, 0.26, 0.56, '#d9b85a', '#ecd27a'); // Heu
-          for (const [fx, fz] of [
-            [0.25, 0.35],
-            [0.55, 0.5],
-            [0.7, 0.3],
-          ] as const)
-            g.box(x + fx, h + 0.46, y + fz, 0.14, 0.06, 0.06, '#f08a3c'); // Möhren
-        }
-        break;
-      }
-      case 'shelterpilz':
-        this.shelterPilz(g, canopy, x, y, h);
-        break;
       case 'klangstein':
-        stoneInto(g, x, y, h);
-        break;
-      case 'cloudpuff':
-        g.box(x + 0.15, h, y + 0.3, 0.5, 0.25, 0.4, '#ffffff', null, 'cloud');
-        g.box(x + 0.4, h, y + 0.15, 0.4, 0.35, 0.45, '#ffffff', null, 'cloud');
-        break;
-      case 'hedge':
-        canopy.box(x + 0.08, h, y + 0.08, 0.84, 0.75, 0.84, '#3a8a35', '#4fa84a', 'leaves');
-        break;
-      case 'arch':
-        g.box(x + 0.02, h, y + 0.38, 0.16, 1.3, 0.2, GAME_COLORS.fenceDark, GAME_COLORS.fence);
-        g.box(x + 0.82, h, y + 0.38, 0.16, 1.3, 0.2, GAME_COLORS.fenceDark, GAME_COLORS.fence);
-        g.box(x, h + 1.3, y + 0.34, 1, 0.2, 0.28, '#3a8a35', '#4fa84a', 'leaves');
-        for (let i = 0; i < 4; i++)
-          g.box(x + 0.12 + i * 0.22, h + 1.5, y + 0.43, 0.1, 0.07, 0.1, i % 2 ? '#e77fb3' : '#ffffff');
-        break;
+        return fineBoxes(fine, stoneBoxes(x, y, h));
       case 'bed':
-        g.box(x + 0.06, h, y + 0.05, 0.88, 0.28, 0.9, ...this.views.bedFrame(c, WOOD_FRAME));
-        g.box(x + 0.1, h + 0.28, y + 0.08, 0.8, 0.12, 0.26, GAME_COLORS.bed.pillow);
-        g.box(x + 0.08, h + 0.28, y + 0.34, 0.84, 0.1, 0.6, GAME_COLORS.bed.blanket);
-        break;
-      case 'sign':
-        g.box(x + 0.44, h, y + 0.44, 0.12, 0.6, 0.12, GAME_COLORS.fenceDark);
-        g.box(x - 0.1, h + 0.6, y + 0.4, 1.2, 0.5, 0.18, GAME_COLORS.board, '#d4a874', 'planks');
-        break;
+        return fineBoxes(fine, bedBoxes(x, y, h, this.views.bedFrame(c, WOOD_BED)));
+      case 'sign': {
+        const region = REGIONS.find((r) => r.id === GATES.find((g) => g.id === c.sign)?.region);
+        return fineBoxes(fine, signBoxes(x, y, h, region?.animals.length ?? 0));
+      }
     }
-  }
-
-  /**
-   * Riesenpilz auf der Wiese als Unterstand: dicker cremefarbener Stiel mit Kragen in der Mitte, darüber ein
-   * hoher, breiter roter Hut mit weißen Tupfen (Laub-Material: vor der Figur wird er durchsichtig). Der Hut sitzt so
-   * hoch, dass man die Tiere in den vorderen Reihen darunter sieht.
-   */
-  private shelterPilz(g: Geo, canopy: Geo, x: number, y: number, h: number) {
-    const { x0, y0, x1, y1 } = homeAt(this.world!, x, y).shelter; // Unterstand der Gegend dieses Stiels
-    const stem = '#efe4d2',
-      stemTop = '#f7efe2',
-      red = '#d9473a',
-      redTop = '#e0574a';
-    g.box(x + 0.15, h, y + 0.15, 0.7, 3.2, 0.7, stem, stemTop);
-    g.box(x - 0.05, h + 2.2, y - 0.05, 1.1, 0.25, 1.1, stem, stemTop); // Kragen
-    const [cx0, cx1] = [x0 - PILZ_OVER, x1 + 1 + PILZ_OVER], // der Hut ragt nur wenig über (vorher 0,6 und 0,8)
-      [cz0, cz1] = [y0 - PILZ_OVER, y1 + 1 + PILZ_OVER];
-    canopy.box(cx0, h + 3.2, cz0, cx1 - cx0, 0.45, cz1 - cz0, red, redTop); // Hutrand
-    canopy.box(cx0 + 0.9, h + 3.65, cz0 + 0.7, cx1 - cx0 - 1.8, 0.45, cz1 - cz0 - 1.4, red, redTop);
-    canopy.box(cx0 + 2.0, h + 4.1, cz0 + 1.3, cx1 - cx0 - 4.0, 0.35, cz1 - cz0 - 2.6, red, redTop); // Kuppe
-    canopy.box(cx0 + 0.05, h + 3.15, cz0 + 0.05, cx1 - cx0 - 0.1, 0.06, cz1 - cz0 - 0.1, '#f3e6c8'); // Lamellen unten
-    // weiße Tupfen auf den Stufen des Huts und vorn am Rand
-    for (const [dx, dz, step] of [
-      [0.2, 0.2, 0],
-      [6.7, 0.25, 0],
-      [0.25, 2.7, 0],
-      [6.6, 2.65, 0],
-      [1.4, 0.9, 1],
-      [5.0, 1.0, 1],
-      [2.0, 1.9, 1],
-      [4.4, 2.0, 1],
-      [3.4, 1.5, 2],
-    ] as const)
-      canopy.box(cx0 + dx, h + 3.65 + step * 0.45, cz0 + dz, 0.5, 0.06, 0.5, '#ffffff');
-    for (const dx of [0.6, 2.4, 4.4, 6.2]) canopy.box(cx0 + dx, h + 3.3, cz1 - 0.02, 0.5, 0.3, 0.04, '#ffffff');
-  }
-
-  private fence(g: Geo, x: number, y: number, h: number) {
-    const w = this.world!;
-    const joins = (dx: number, dy: number) => {
-      const d = w.cell(x + dx, y + dy).deco;
-      return d === 'fence' || d === 'gate';
-    };
-    const [c, top] = [GAME_COLORS.fence, GAME_COLORS.fenceDark];
-    g.box(x + 0.4, h, y + 0.4, 0.2, 0.8, 0.2, c, top, 'planks');
-    if (joins(0, -1)) g.box(x + 0.45, h + 0.3, y, 0.1, 0.12, 0.5, c, top, 'planks');
-    if (joins(0, 1)) g.box(x + 0.45, h + 0.3, y + 0.5, 0.1, 0.12, 0.5, c, top, 'planks');
-    if (joins(-1, 0)) g.box(x, h + 0.3, y + 0.45, 0.5, 0.12, 0.1, c, top, 'planks');
-    if (joins(1, 0)) g.box(x + 0.5, h + 0.3, y + 0.45, 0.5, 0.12, 0.1, c, top, 'planks');
+    const world = this.world!;
+    const boxes = decoBoxes(world, c, x, y, this.at.picked, () => homeAt(world, x, y).shelter);
+    // Laub vor der Figur durchsichtig, Kristalle leuchten aus sich selbst
+    fineBoxes(fine, boxes ?? [], c.deco === 'crystal' ? bright : undefined);
   }
 
   // ---------- Bewegliches: Wesen, Tore, Tafeln, Schläfer ----------
 
-  private model(key: string, parts: readonly Part[]) {
-    let g = this.models.get(key);
-    if (!g) {
-      g = modelGeometry(parts);
-      this.models.set(key, g);
+  private model(key: string, parts: readonly Part[], scale = 1): Model {
+    let m = this.models.get(key);
+    if (!m) {
+      m = modelGeometry(parts, scale);
+      this.models.set(key, m);
     }
-    return g;
+    return m;
   }
 
   /**
@@ -937,21 +780,37 @@ export class World3D {
    */
   private syncBodies(state: State, sc: Scene, facing: number) {
     const seen = new Set<string>();
+    const contacts: Contact[] = []; // weicher Fleck unter jedem Körper (mitwachsen-fine-bodies-3d.ts)
+    this.bodyHalos = [];
     type At = { x: number; y: number; z: number; hop?: number; puff?: number };
-    const place = (id: string, geo: BufferGeometry, scale: number, dir: Dir, b: At | undefined = sc.bodies.get(id)) => {
+    // `foot`: Halbbreite des Flecks (0: keiner); `ground`: Boden unter einem hängenden Tier (sonst der Boden des Körpers)
+    const place = (
+      id: string,
+      model: Model,
+      scale: number,
+      dir: Dir,
+      b = sc.bodies.get(id) as At | undefined,
+      foot = 0.24,
+      ground?: number,
+    ) => {
       if (!b) return;
       seen.add(id);
       let m = this.bodies.get(id);
       if (!m) {
-        m = new Mesh(geo, this.entity);
+        m = new Mesh(model.geo, this.entity);
         m.castShadow = true;
         this.scene.add(m);
         this.bodies.set(id, m);
       }
-      m.geometry = geo;
-      m.scale.setScalar(scale * (b.puff ?? 1)); // Haltung im Iglu: aufgeplustert oder eingerollt
+      m.geometry = model.geo;
+      const size = scale * (b.puff ?? 1); // Haltung im Iglu: aufgeplustert oder eingerollt
+      m.scale.setScalar(size);
       m.position.set(b.x + 0.5, b.z + (b.hop ?? 0), b.y + 0.5);
       m.rotation.y = id === 'player' && sc.pose !== 'stand' ? facing : YAW[dir];
+      const at = { x: b.x + 0.5, y: b.y + 0.5, z: b.z + (b.hop ?? 0) };
+      if (foot > 0)
+        contacts.push({ ...at, z: ground ?? b.z, hop: ground === undefined ? (b.hop ?? 0) : 0, foot: foot * size });
+      if (model.halos.length) this.bodyHalos.push(...placeHalos(model.halos, at, m.rotation.y, size, id));
     };
     if (!state.sleeping && !state.ride) {
       // Korb auf dem Rücken, Eimer (Kanne) und Netz in den Händen, Buch beim Lesen; beim Lesen schaut die Figur zum Betrachter
@@ -966,7 +825,7 @@ export class World3D {
         ...(book ? BOOK_PARTS(this.look, turning) : []),
         ...(doze ? SLEEPY_EYES(this.look) : []),
       ];
-      place('player', this.model(key, parts), 1, book ? 's' : state.player.dir);
+      place('player', this.model(key, parts), 1, book ? 's' : state.player.dir, undefined, 0.3);
     }
     for (const a of state.animals) {
       const b = sc.bodies.get(a.id);
@@ -974,16 +833,18 @@ export class World3D {
       const sp = SPECIES[a.species];
       const perch = this.world ? hangAt(a, this.world.cell(a.x, a.y)) : undefined; // kopfüber am Sitzplatz (Fledermaus im Bogen)
       if (perch !== undefined && sc.away(a.x, a.y)) continue; // gerade auf ihrer Runde (Bild des Welt-Pakets)
-      if (b && perch !== undefined && sp.roost)
-        place(a.id, this.model(`${a.species}-roost`, sp.roost), sp.scale, a.dir, { ...b, z: b.z + perch, hop: 0 });
-      else if (a.solo && sp.solo) place(a.id, this.model(`${a.species}-solo`, sp.solo), sp.scale, a.dir);
-      else place(a.id, this.model(a.species, sp.parts), sp.scale, a.dir);
+      if (b && perch !== undefined && sp.roost) {
+        const roost = this.model(`${a.species}-roost`, sp.roost, sp.scale);
+        place(a.id, roost, sp.scale, a.dir, { ...b, z: b.z + perch, hop: 0 }, 0.24, b.z);
+      } else if (a.solo && sp.solo) place(a.id, this.model(`${a.species}-solo`, sp.solo, sp.scale), sp.scale, a.dir);
+      else place(a.id, this.model(a.species, sp.parts, sp.scale), sp.scale, a.dir);
     }
     for (const r of sc.rides)
       if (this.explored(Math.round(r.x), Math.round(r.y))) {
-        place(r.id, this.model(r.key, r.parts), 1, r.dir, r);
+        place(r.id, this.model(r.key, r.parts), 1, r.dir, r, footOf(r));
         this.bodies.get(r.id)!.material = r.sheer ? this.sheer : this.entity;
       }
+    this.contacts.update(contacts, sc.reduced);
     for (const [id, m] of this.bodies)
       if (!seen.has(id)) {
         this.scene.remove(m);
@@ -1003,13 +864,14 @@ export class World3D {
       const sign = g.sign;
       const region = REGIONS.find((r) => r.id === g.region)!;
       const n = region.animals.length;
+      const top = (this.world?.cell(sign[0], sign[1]).h ?? 1) + SIGN_TOP; // auf dem Rahmen der Tafel
       region.animals.forEach((a, i) => {
         const met = state.met.includes(`${region.id}:${a.species}`);
         const sp = SPECIES[a.species];
-        const m = new Mesh(this.model(a.species, sp.parts), met ? this.entity : this.dark);
+        const m = new Mesh(this.model(a.species, sp.parts, sp.scale).geo, met ? this.entity : this.dark);
         m.scale.setScalar(sp.scale * 0.45);
         m.rotation.y = facing;
-        m.position.set(sign[0] + 0.5 + (i - (n - 1) / 2) * 0.42, 2.1, sign[1] + 0.5);
+        m.position.set(sign[0] + 0.5 + (i - (n - 1) / 2) * 0.55, top, sign[1] + 0.5);
         this.signs.add(m);
       });
     }
@@ -1025,9 +887,7 @@ export class World3D {
       }
       this.sleeperAt = `${x},${y}`;
       const g = new Geo();
-      g.box(x + 0.32, 1.38, y + 0.1, 0.36, 0.3, 0.24, this.look.skin);
-      g.box(x + 0.31, 1.62, y + 0.09, 0.38, 0.1, 0.26, this.look.hair);
-      g.box(x + 0.1, 1.38, y + 0.36, 0.8, 0.14, 0.56, GAME_COLORS.bed.blanket);
+      for (const b of sleeperBoxes(x, y, this.world!.cell(x, y).h, this.look)) fineBox(g, b);
       this.sleeper.add(new Mesh(g.build(), this.entity));
     }
     this.sleeper.visible = state.sleeping;

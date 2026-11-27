@@ -6,7 +6,7 @@ import { EIS_PACK, HOEHLE_PACK, worldOf } from './test-worlds';
 import type { Scene } from './mitwachsen-render';
 import { initialState } from './mitwachsen-state';
 
-const WOOD: Frame = ['#8a5a30', null, 'planks'];
+const WOOD: Frame = ['#8a5a30', null, 'holz'];
 const snow: Cell = { h: 2, ground: 'snow', deco: 'bed', region: 'eis', solid: false, biome: 'eis' };
 const grass: Cell = { h: 1, ground: 'grass', deco: 'bed', region: 'lichtung', solid: false };
 const STATE = initialState(worldOf(1));

@@ -7,6 +7,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Was angezeigt wird“, Zeile „Fußspuren“)
 
 import type { Projection } from '../../../../lib/games/front';
+import { fringeAlpha, softMark } from '../../../../lib/games/shade';
 import { SPECIES, type SpeciesId } from '../../../../data/games/mitwachsen';
 import { Tracks, marks, printOf, type Print, type PrintKind } from '../../mitwachsen-tracks';
 import type { SkyScene } from '../../mitwachsen-sky';
@@ -97,23 +98,32 @@ export class Prints {
     this.tracks.add(from[0], from[1], dx ? (dx > 0 ? 'e' : 'w') : dy > 0 ? 's' : 'n', kind);
   }
 
-  /** 2D: die Abdrücke der Reihe `y`, flach auf ihrem Schnee (nach dem Boden der Reihe, vor Dingen und Wesen) */
+  /**
+   * 2D: die Abdrücke der Reihe `y`, flach auf ihrem Schnee (nach dem Boden der Reihe, vor Dingen und Wesen), mit weichem
+   * Rand (Entwurf „Feine Grafik“): erst je Teil der um den Saum gewachsene Fleck blass, dann das Teil selbst, so dass die
+   * Mitte so deutlich ist wie vorher (`fringeAlpha`)
+   */
   draw(ctx: CanvasRenderingContext2D, world: World, P: Projection, y: number) {
     for (const [p, a] of this.rows.get(y) ?? []) {
       const h = world.cell(p.x, p.y).h;
-      ctx.fillStyle = `rgba(${PRINT_RGB},${(ALPHA * a).toFixed(3)})`;
-      for (const [mx, my, w, d] of marks(p)) {
-        const [ax, ay] = P(mx, my, h);
-        const [bx, by] = P(mx + w, my + d, h);
-        ctx.fillRect(
-          Math.round(ax),
-          Math.round(ay),
-          Math.max(1, Math.round(bx - ax)),
-          Math.max(1, Math.round(by - ay)),
-        );
+      const parts = marks(p);
+      const [outer, inner] = fringeAlpha(ALPHA * a);
+      ctx.fillStyle = `rgba(${PRINT_RGB},${outer.toFixed(3)})`;
+      for (const [mx, my, w, d] of parts) {
+        const s = softMark(mx, my, w, d);
+        rect(ctx, P, s.x, s.y, s.w, s.d, h);
       }
+      ctx.fillStyle = `rgba(${PRINT_RGB},${inner.toFixed(3)})`;
+      for (const [mx, my, w, d] of parts) rect(ctx, P, mx, my, w, d, h);
     }
   }
+}
+
+/** Ein flaches Rechteck auf der Höhe `h`, auf ganze Pixel gerundet, mindestens ein Pixel groß */
+function rect(ctx: CanvasRenderingContext2D, P: Projection, x: number, y: number, w: number, d: number, h: number) {
+  const [ax, ay] = P(x, y, h);
+  const [bx, by] = P(x + w, y + d, h);
+  ctx.fillRect(Math.round(ax), Math.round(ay), Math.max(1, Math.round(bx - ax)), Math.max(1, Math.round(by - ay)));
 }
 
 /** Die Spuren der Eis-Welt (eine für das Spiel; 2D zeichnet sie, der 3D-Teil liest `seen`) */

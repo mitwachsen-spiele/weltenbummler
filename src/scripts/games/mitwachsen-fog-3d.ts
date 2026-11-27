@@ -25,3 +25,15 @@ function blur(a: Float32Array, n: number): Float32Array {
     }
   return b;
 }
+
+/**
+ * Wie deutlich Feld (x, y) durch den Nebel zu sehen ist (0 … 1), genau wie der Shader die Maske mischt
+ * (`smoothstep(0,08, 0,92)` auf dem Texel des Felds, FOG_FRAGMENT in mitwachsen-fine-3d.ts); außerhalb der Maske 0
+ */
+export function fogSeen(mask: Uint8Array, ox: number, oy: number, n: number, x: number, y: number): number {
+  const i = x - ox,
+    j = y - oy;
+  if (i < 0 || j < 0 || i >= n || j >= n) return 0;
+  const t = Math.max(0, Math.min(1, ((mask[j * n + i] ?? 0) / 255 - 0.08) / 0.84));
+  return t * t * (3 - 2 * t);
+}

@@ -5,6 +5,7 @@
 import { eyes, type Part } from '../../lib/games/front';
 import { ICE_SPECIES, type IceSpeciesId } from './mitwachsen-eis';
 import { CAVE_BEINGS, CAVE_SPECIES, type CaveBeingId, type CaveSpeciesId } from './mitwachsen-hoehle';
+import { CARRY_DRESS, dress, fineBook, fineFigure, fineSpecies } from './mitwachsen-fine';
 import type { SpeciesOf } from './mitwachsen-species';
 
 /**
@@ -213,7 +214,8 @@ const legs = (front: number, back: number, half: number, size: number, h: number
   [back, half - size, 0, size, size, h, color],
 ];
 
-export const SPECIES: Record<SpeciesId, Species> = {
+// Fein (Muster, Zusatzteile): mitwachsen-fine.ts
+export const SPECIES: Record<SpeciesId, Species> = fineSpecies({
   hase: {
     id: 'hase',
     name: 'Hase',
@@ -489,7 +491,7 @@ export const SPECIES: Record<SpeciesId, Species> = {
   },
   ...ICE_SPECIES,
   ...CAVE_BEINGS,
-};
+});
 
 /** Arten, die frei in der endlosen Landschaft unterwegs sind */
 export const WILD_SPECIES: readonly SpeciesId[] = ['hase', 'igel', 'schaf', 'fuchs', 'eichhoernchen', 'ente'];
@@ -499,73 +501,85 @@ export const WILD_SPECIES: readonly SpeciesId[] = ['hase', 'igel', 'schaf', 'fuc
 export type Look = { skin: string; hair: string; shirt: string; sleeve: string; pants: string };
 export const LOOK: Look = { skin: '#e9b48e', hair: '#c9a35b', shirt: '#3f7fd0', sleeve: '#3570b8', pants: '#2d3448' };
 
-export const figureParts = (l: Look): Part[] => [
-  [-0.06, -0.2, 0.06, 0.12, 0.17, 0.28, l.pants],
-  [-0.06, 0.03, 0.06, 0.12, 0.17, 0.28, l.pants],
-  [-0.07, -0.21, 0, 0.17, 0.19, 0.07, '#6b4a36', '#7d5a44'], // Schuhe
-  [-0.07, 0.02, 0, 0.17, 0.19, 0.07, '#6b4a36', '#7d5a44'],
-  [-0.12, -0.22, 0.34, 0.24, 0.44, 0.4, l.shirt],
-  [-0.125, -0.225, 0.34, 0.25, 0.45, 0.05, '#2a2f3d'], // Gürtel
-  [0.115, -0.08, 0.66, 0.012, 0.16, 0.06, '#f6f3ec'], // Kragen
-  [-0.06, -0.3, 0.42, 0.12, 0.08, 0.3, l.sleeve],
-  [-0.06, 0.22, 0.42, 0.12, 0.08, 0.3, l.sleeve],
-  [-0.05, -0.305, 0.34, 0.1, 0.09, 0.08, l.skin], // Hände
-  [-0.05, 0.215, 0.34, 0.1, 0.09, 0.08, l.skin],
-  [-0.22, -0.23, 0.74, 0.46, 0.46, 0.4, l.skin],
-  [-0.05, -0.255, 0.84, 0.07, 0.03, 0.09, l.skin], // Ohren
-  [-0.05, 0.225, 0.84, 0.07, 0.03, 0.09, l.skin],
-  [-0.23, -0.24, 1.04, 0.48, 0.48, 0.14, l.hair],
-  [-0.25, -0.24, 0.84, 0.08, 0.48, 0.3, l.hair],
-  [0.2, -0.24, 0.99, 0.05, 0.48, 0.07, l.hair], // Stirnfransen
-  [-0.2, -0.245, 0.92, 0.18, 0.02, 0.14, l.hair], // Haare an den Seiten
-  [-0.2, 0.225, 0.92, 0.18, 0.02, 0.14, l.hair],
-  [0.24, -0.04, 0.79, 0.012, 0.08, 0.02, '#a0524a'], // Mund
-  [0.24, -0.19, 0.82, 0.012, 0.05, 0.03, '#f0a090'], // Bäckchen
-  [0.24, 0.14, 0.82, 0.012, 0.05, 0.03, '#f0a090'],
-  ...eyes(0.24, 0.23, 0.88, 0.07, 0.1, 0.06),
-];
+/** Die Figur, fein (`fineFigure`: Sohlen, Nase, Strähnen, Bündchen, Muster); die ersten `FIGURE_LEGS` Teile sind Beine */
+export const figureParts = (l: Look): Part[] =>
+  fineFigure(l, [
+    [-0.06, -0.2, 0.06, 0.12, 0.17, 0.28, l.pants],
+    [-0.06, 0.03, 0.06, 0.12, 0.17, 0.28, l.pants],
+    [-0.07, -0.21, 0, 0.17, 0.19, 0.07, '#6b4a36', '#7d5a44'], // Schuhe
+    [-0.07, 0.02, 0, 0.17, 0.19, 0.07, '#6b4a36', '#7d5a44'],
+    [-0.12, -0.22, 0.34, 0.24, 0.44, 0.4, l.shirt],
+    [-0.125, -0.225, 0.34, 0.25, 0.45, 0.05, '#2a2f3d'], // Gürtel
+    [0.115, -0.08, 0.66, 0.012, 0.16, 0.06, '#f6f3ec'], // Kragen
+    [-0.06, -0.3, 0.42, 0.12, 0.08, 0.3, l.sleeve],
+    [-0.06, 0.22, 0.42, 0.12, 0.08, 0.3, l.sleeve],
+    [-0.05, -0.305, 0.34, 0.1, 0.09, 0.08, l.skin], // Hände
+    [-0.05, 0.215, 0.34, 0.1, 0.09, 0.08, l.skin],
+    [-0.22, -0.23, 0.74, 0.46, 0.46, 0.4, l.skin],
+    [-0.05, -0.255, 0.84, 0.07, 0.03, 0.09, l.skin], // Ohren
+    [-0.05, 0.225, 0.84, 0.07, 0.03, 0.09, l.skin],
+    [-0.23, -0.24, 1.04, 0.48, 0.48, 0.14, l.hair],
+    [-0.25, -0.24, 0.84, 0.08, 0.48, 0.3, l.hair],
+    [0.2, -0.24, 0.99, 0.05, 0.48, 0.07, l.hair], // Stirnfransen
+    [-0.2, -0.245, 0.92, 0.18, 0.02, 0.14, l.hair], // Haare an den Seiten
+    [-0.2, 0.225, 0.92, 0.18, 0.02, 0.14, l.hair],
+    [0.24, -0.04, 0.79, 0.012, 0.08, 0.02, '#a0524a'], // Mund
+    [0.24, -0.19, 0.82, 0.012, 0.05, 0.03, '#f0a090'], // Bäckchen
+    [0.24, 0.14, 0.82, 0.012, 0.05, 0.03, '#f0a090'],
+    ...eyes(0.24, 0.23, 0.88, 0.07, 0.1, 0.06),
+  ]);
 
 /** Korb mit Beeren auf dem Rücken der Figur (nach dem Pflücken, bis zum Futtertrog) */
-export const BASKET_PARTS: Part[] = [
-  [-0.33, -0.17, 0.38, 0.21, 0.34, 0.3, '#b0803c', '#c9984e'], // Korb aus Weide
-  [-0.335, -0.175, 0.47, 0.22, 0.35, 0.03, '#8a5f2a'], // Flechtband
-  [-0.335, -0.175, 0.6, 0.22, 0.35, 0.03, '#8a5f2a'],
-  [-0.12, -0.15, 0.7, 0.25, 0.04, 0.03, '#8a5f2a'], // Riemen über den Schultern
-  [-0.12, 0.11, 0.7, 0.25, 0.04, 0.03, '#8a5f2a'],
-  [-0.3, -0.13, 0.68, 0.16, 0.26, 0.06, '#c8323a', '#ef5b5b'], // Beeren obenauf
-  [-0.27, -0.1, 0.74, 0.07, 0.07, 0.05, '#c8323a', '#ef5b5b'],
-  [-0.23, 0.02, 0.74, 0.07, 0.07, 0.05, '#c8323a', '#ef5b5b'],
-  [-0.2, -0.05, 0.74, 0.05, 0.06, 0.04, '#3f9a3c', '#5ab651'], // Blatt
-];
+export const BASKET_PARTS: Part[] = dress(
+  [
+    [-0.33, -0.17, 0.38, 0.21, 0.34, 0.3, '#b0803c', '#c9984e'], // Korb aus Weide
+    [-0.335, -0.175, 0.47, 0.22, 0.35, 0.03, '#8a5f2a'], // Flechtband
+    [-0.335, -0.175, 0.6, 0.22, 0.35, 0.03, '#8a5f2a'],
+    [-0.12, -0.15, 0.7, 0.25, 0.04, 0.03, '#8a5f2a'], // Riemen über den Schultern
+    [-0.12, 0.11, 0.7, 0.25, 0.04, 0.03, '#8a5f2a'],
+    [-0.3, -0.13, 0.68, 0.16, 0.26, 0.06, '#c8323a', '#ef5b5b'], // Beeren obenauf
+    [-0.27, -0.1, 0.74, 0.07, 0.07, 0.05, '#c8323a', '#ef5b5b'],
+    [-0.23, 0.02, 0.74, 0.07, 0.07, 0.05, '#c8323a', '#ef5b5b'],
+    [-0.2, -0.05, 0.74, 0.05, 0.06, 0.04, '#3f9a3c', '#5ab651'], // Blatt
+  ],
+  CARRY_DRESS,
+);
 
 /** Eimer mit Wasser in der rechten Hand (nach dem Schöpfen am Wasser, bis zum Wassertrog) */
-export const BUCKET_PARTS: Part[] = [
-  [-0.11, 0.27, 0.06, 0.22, 0.2, 0.22, '#98a3ae', '#3f8fd8'], // Eimer aus Blech, oben Wasser
-  [-0.115, 0.265, 0.25, 0.23, 0.21, 0.03, '#76818c'], // Rand
-  [-0.01, 0.36, 0.28, 0.02, 0.02, 0.08, '#5d6873'], // Henkel bis zur Hand
-];
+export const BUCKET_PARTS: Part[] = dress(
+  [
+    [-0.11, 0.27, 0.06, 0.22, 0.2, 0.22, '#98a3ae', '#3f8fd8'], // Eimer aus Blech, oben Wasser
+    [-0.115, 0.265, 0.25, 0.015, 0.21, 0.04, '#76818c'], // Rand ringsum, das Wasser bleibt zu sehen
+    [0.1, 0.265, 0.25, 0.015, 0.21, 0.04, '#76818c'],
+    [-0.1, 0.265, 0.25, 0.2, 0.015, 0.04, '#76818c'],
+    [-0.1, 0.46, 0.25, 0.2, 0.015, 0.04, '#76818c'],
+    [-0.01, 0.36, 0.29, 0.02, 0.02, 0.08, '#5d6873'], // Henkel bis zur Hand
+  ],
+  CARRY_DRESS,
+);
 
 /**
  * Großes, aufgeschlagenes Buch auf dem Schoß, wenn niemand spielt: Die weißen Seiten mit Zeilen zeigen nach oben,
  * so erkennt man es auch von schräg oben. `turning`: Eine Seite steht gerade hoch (umblättern).
  */
-export const BOOK_PARTS = (l: Look, turning = false): Part[] => [
-  [-0.02, -0.31, 0.4, 0.16, 0.08, 0.08, l.sleeve], // Unterarme nach vorn
-  [-0.02, 0.23, 0.4, 0.16, 0.08, 0.08, l.sleeve],
-  [0.12, -0.33, 0.4, 0.09, 0.07, 0.07, l.skin], // Hände halten das Buch
-  [0.12, 0.26, 0.4, 0.09, 0.07, 0.07, l.skin],
-  [0.1, -0.29, 0.38, 0.34, 0.58, 0.04, '#c0453a', '#c0453a'], // roter Einband, ragt am Rand hervor
-  [0.12, -0.27, 0.42, 0.3, 0.255, 0.04, '#e9e4d8', '#ffffff'], // linke Seite
-  [0.12, 0.015, 0.42, 0.3, 0.255, 0.04, '#e9e4d8', '#ffffff'], // rechte Seite
-  [0.12, -0.015, 0.42, 0.3, 0.03, 0.03, '#8a3a30'], // Buchrücken in der Mitte
-  // Zeilen auf beiden Seiten, rechts ein kleines Bild
-  ...[0.16, 0.22, 0.28, 0.34].flatMap((f): Part[] => [
-    [f, -0.24, 0.461, 0.025, 0.2, 0.004, '#9aa0aa'],
-    ...(f < 0.27 ? [[f, 0.045, 0.461, 0.025, 0.2, 0.004, '#9aa0aa'] as Part] : []),
-  ]),
-  [0.27, 0.06, 0.461, 0.1, 0.16, 0.004, '#6dbd47'],
-  ...(turning ? [[0.14, -0.01, 0.46, 0.26, 0.02, 0.22, '#f6f3ec', '#ffffff'] as Part] : []), // Seite beim Umblättern
-];
+export const BOOK_PARTS = (l: Look, turning = false): Part[] =>
+  fineBook(l, [
+    [-0.02, -0.31, 0.4, 0.16, 0.08, 0.08, l.sleeve], // Unterarme nach vorn
+    [-0.02, 0.23, 0.4, 0.16, 0.08, 0.08, l.sleeve],
+    [0.12, -0.33, 0.4, 0.09, 0.07, 0.07, l.skin], // Hände halten das Buch
+    [0.12, 0.26, 0.4, 0.09, 0.07, 0.07, l.skin],
+    [0.1, -0.29, 0.38, 0.34, 0.58, 0.04, '#c0453a', '#c0453a'], // roter Einband, ragt am Rand hervor
+    [0.12, -0.27, 0.42, 0.3, 0.255, 0.04, '#e9e4d8', '#ffffff'], // linke Seite
+    [0.12, 0.015, 0.42, 0.3, 0.255, 0.04, '#e9e4d8', '#ffffff'], // rechte Seite
+    [0.12, -0.015, 0.42, 0.3, 0.03, 0.03, '#8a3a30'], // Buchrücken in der Mitte
+    // Zeilen auf beiden Seiten, rechts ein kleines Bild
+    ...[0.16, 0.22, 0.28, 0.34].flatMap((f): Part[] => [
+      [f, -0.24, 0.461, 0.025, 0.2, 0.004, '#9aa0aa'],
+      ...(f < 0.27 ? [[f, 0.045, 0.461, 0.025, 0.2, 0.004, '#9aa0aa'] as Part] : []),
+    ]),
+    [0.27, 0.06, 0.461, 0.1, 0.16, 0.004, '#6dbd47'],
+    ...(turning ? [[0.14, -0.01, 0.46, 0.26, 0.02, 0.22, '#f6f3ec', '#ffffff'] as Part] : []), // Seite beim Umblättern
+  ]);
 
 /** Geschlossene Augen beim Einnicken: Haut über den Augen, darauf ein dunkler Strich */
 export const SLEEPY_EYES = (l: Look): Part[] => [

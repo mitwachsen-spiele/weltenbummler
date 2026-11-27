@@ -8,6 +8,11 @@ import { hash } from '../../../../lib/games/rng';
 import { SNOW_FILL_COLORS as C } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import type { Cell } from '../../mitwachsen-cell';
 import type { Box } from '../../mitwachsen-view';
+import type { Fine } from '../../../../lib/games/front';
+
+/** Feinheit: Schneewehen glitzern, Beeren glänzen (Sterne, Kiesel, Halme bleiben schlicht: zu klein für ein Muster) */
+const SNOW: Fine = { skin: 'schnee' },
+  BERRY: Fine = { skin: 'lack' };
 
 /** Plätze der Sterne in einem Feld (Mitte, von der Ecke gemessen) und ihre Größe */
 const STARS = [
@@ -54,8 +59,8 @@ export function fillBoxes(c: Cell, x: number, y: number, glint = 0): Box[] | nul
     case 'snowdrift':
       return [
         [x + 0.07, y + 0.22, h, 0.76, 0.56, 0.05, ...C.shadow],
-        [x + 0.15, y + 0.3, h, 0.6, 0.4, 0.3, ...C.drift],
-        [at(0.44, 0.32), y + 0.36, h + 0.3, 0.32, 0.26, 0.12, ...C.drift],
+        [x + 0.15, y + 0.3, h, 0.6, 0.4, 0.3, ...C.drift, undefined, SNOW],
+        [at(0.44, 0.32), y + 0.36, h + 0.3, 0.32, 0.26, 0.12, ...C.drift, undefined, SNOW],
       ];
     case 'iceflower': {
       const color = C.flowers[note % 2] ?? C.flowers[0];
@@ -85,8 +90,8 @@ export function fillBoxes(c: Cell, x: number, y: number, glint = 0): Box[] | nul
     case 'tundra': {
       const boxes = BLADES.map(([dx, dy, hh]): Box => [at(dx, 0.1), y + dy, h, 0.1, 0.1, hh, ...C.tuft]);
       if (note) {
-        boxes.push([at(0.2, 0.12), y + 0.6, h, 0.12, 0.12, 0.12, C.berry, C.berry]);
-        boxes.push([at(0.62, 0.12), y + 0.6, h, 0.12, 0.12, 0.12, C.berry, C.berry]);
+        boxes.push([at(0.2, 0.12), y + 0.6, h, 0.12, 0.12, 0.12, C.berry, C.berry, undefined, BERRY]);
+        boxes.push([at(0.62, 0.12), y + 0.6, h, 0.12, 0.12, 0.12, C.berry, C.berry, undefined, BERRY]);
       }
       return boxes;
     }

@@ -34,7 +34,7 @@ export default defineConfig(
   // fällt, verliert seine Zeile.
   {
     files: ['src/data/games/mitwachsen.ts'],
-    rules: { 'max-lines': ['error', { max: 535, skipBlankLines: true, skipComments: true }] },
+    rules: { 'max-lines': ['error', { max: 559, skipBlankLines: true, skipComments: true }] }, // gemessen 532
   },
   {
     files: ['src/scripts/games/larmic-mitwachsen.ts'],
@@ -48,7 +48,7 @@ export default defineConfig(
     files: ['src/scripts/games/mitwachsen-3d.ts'],
     rules: {
       complexity: ['error', 38],
-      'max-lines': ['error', { max: 901, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 901, skipBlankLines: true, skipComments: true }], // seit Feine Grafik 749
       'max-lines-per-function': ['error', { max: 140, skipBlankLines: true, skipComments: true }],
     },
   },
@@ -60,7 +60,7 @@ export default defineConfig(
     files: ['src/scripts/games/mitwachsen-render.ts'],
     rules: {
       complexity: ['error', 53],
-      'max-lines': ['error', { max: 951, skipBlankLines: true, skipComments: true }], // gemessen 906
+      'max-lines': ['error', { max: 951, skipBlankLines: true, skipComments: true }], // gemessen 906, seit Feine Grafik 789
       'max-lines-per-function': ['error', { max: 153, skipBlankLines: true, skipComments: true }],
     },
   },

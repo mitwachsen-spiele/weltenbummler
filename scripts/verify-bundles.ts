@@ -26,8 +26,9 @@ export const RULES: Rule[] = [
     name: 'Spiel lädt 3D erst bei Bedarf',
     pages: /^index\.html$/,
     // Kern: Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
-    // Gemessen 157,8 KB (mit dem Hinführen zu Sehenswürdigkeiten: Regeln, Funkelfreund, Ruf)
-    budget: 173.6 * 1024,
+    // Gemessen 194,5 KB (27.11.2026, nach Issue 13; mit feinen Flächen: Muster, Maler, Bild-Cache und Leuchten laufen im
+    // Kern), Grenze zuletzt angehoben bei 184,9 KB
+    budget: 203.4 * 1024,
     // Probe: Der Höhlenhimmel der Grotte steht nur in ihrem Welt-Paket (GROTTE_COLORS.sky)
     forbidden: /WebGLRenderer|three\.module|#4a4370/,
   },
@@ -50,8 +51,9 @@ export const RULES: Rule[] = [
       // Drehung zur Torfront: kommt erst nach der 3D-Ansicht, wenn die Figur einem Tor nah ist (`NEAR_GATE`)
       { chunks: /\/mitwachsen-turn-3d\.[\w-]+\.js$/, after: /\/mitwachsen-3d\.[\w-]+\.js$/ },
     ],
-    // Gemessen 91 693 Bytes (89,5 KB)
-    budget: 97 * 1024,
+    // Gemessen 95,5 KB (mit feinen Flächen: Muster und Leuchten im Shader, feine Kronen, Pflanzen der Torhäuser;
+    // vorher 92,5 KB): unter 3 % Luft, darum Grenze nach gemessen + 10 %
+    budget: 105.1 * 1024,
     // Three.js liegt nur in seiner eigenen Datei. Proben: Das Leuchten der Eiszapfen gibt es nur im 3D-Teil der
     // Eis-Welt (ICE_GLOW in worlds/eis/view-3d-gate.ts), den Höhlenhimmel nur im Paket der Grotte
     forbidden: /WebGLRenderer|three\.module|#7fd6ff|#4a4370/,
@@ -106,8 +108,9 @@ export const RULES: Rule[] = [
       // 3D-Teil: kommt erst nach der 3D-Ansicht und dem Paket der Bahn
       { chunks: /\/welt-bahn-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-bahn)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 51,3 KB
-    budget: 56.5 * 1024,
+    // Gemessen 55,2 KB (mit feinen Flächen an Zug, Gleis, Bahnhöfen und Tok; vorher 53,5 KB): unter 3 % Luft, darum
+    // Grenze nach gemessen + 10 %
+    budget: 60.8 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {

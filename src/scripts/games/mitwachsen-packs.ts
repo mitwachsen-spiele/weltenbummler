@@ -60,12 +60,13 @@ const loadPack = (id: PackId) => LOADERS[id]?.() ?? Promise.reject(new Error(`ke
 type Models = Partial<Record<SpeciesId, readonly Part[]>>;
 /**
  * Modelle von Arten aus einem Welt-Paket eintragen (Eis-Welt: ihre zehn Tiere, `ICE_MODELS`; Höhlenwelt: ihre acht,
- * `roosts` die Fledermaus kopfüber): sobald das Paket ankommt, bevor eines seiner Tiere erscheint. Bis dahin ist ihr
+ * `roosts` die Fledermaus kopfüber; `outlines` die Grundform ohne Feinteile für den Umriss): sobald das Paket ankommt, bevor eines seiner Tiere erscheint. Bis dahin ist ihr
  * Modell leer (der Kern kennt nur Name, Ton, Gangart). Ändert `SPECIES` für die ganze Seite (in Tests: test-worlds.ts
  * ruft es beim Import).
  */
-export function addModels(models: Models = {}, roosts: Models = {}, solos: Models = {}) {
+export function addModels(models: Models = {}, roosts: Models = {}, solos: Models = {}, outlines: Models = {}) {
   for (const [id, parts] of Object.entries(models) as [SpeciesId, readonly Part[]][]) SPECIES[id].parts = parts;
+  for (const [id, parts] of Object.entries(outlines) as [SpeciesId, readonly Part[]][]) SPECIES[id].outline = parts;
   for (const [id, parts] of Object.entries(roosts) as [SpeciesId, readonly Part[]][]) SPECIES[id].roost = parts;
   for (const [id, parts] of Object.entries(solos) as [SpeciesId, readonly Part[]][]) SPECIES[id].solo = parts;
 }
@@ -138,7 +139,7 @@ export class Packs {
         id,
         this.load(id).then(
           (pack) => {
-            addModels(pack.models, pack.roosts, pack.solos);
+            addModels(pack.models, pack.roosts, pack.solos, pack.outlines);
             this.ready.push(pack);
             this.arrive(pack);
           },

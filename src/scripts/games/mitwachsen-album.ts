@@ -5,7 +5,7 @@
 // Lichtung wartet (mit Helm, mitwachsen-herald.ts). Gleich für 2D und die Ebene über 3D.
 // Spezifikation: docs/specs/mitwachsen.md („Was angezeigt wird“, Leiste unten)
 
-import { TILE_W, drawModel, projection } from '../../lib/games/front';
+import { TILE_W, drawModel, projection, type Part } from '../../lib/games/front';
 import {
   GAME_COLORS,
   GATES,
@@ -16,6 +16,7 @@ import {
   type RegionId,
   type SpeciesId,
 } from '../../data/games/mitwachsen';
+import { ICON_PAINTER, Sprites, modelExtent } from './mitwachsen-fine-2d';
 import { ASK, HEART, sprite } from './mitwachsen-glyphs';
 import { guideGate, leader } from './mitwachsen-guide';
 import { heraldOf } from './mitwachsen-herald';
@@ -29,8 +30,18 @@ export type Signs = Pick<Sky, 'turnAlbum' | 'realmSign'>;
 /** `guest`: Platz eines Gasts mit dem Zeichen der Gegend, in die er gehört */
 type Slot = { species: SpeciesId; met: boolean; home: boolean; follows: boolean; guest?: RegionId };
 
+/** Laufende Nummer je Modell (ein Welt-Paket kann das Modell einer Art später bringen): Teil des Bild-Schlüssels */
+const models = new WeakMap<readonly Part[], number>();
+let modelCount = 0;
+function modelId(parts: readonly Part[]) {
+  const id = models.get(parts) ?? ++modelCount;
+  models.set(parts, id);
+  return id;
+}
+
 export class Album {
   private turn: Turn = {}; // Umklappen beim Wechsel der Gegend
+  private icons = new Sprites(96); // die Tiere der Plätze als Bild je Art, Modell, gefunden/verloren und Größe
 
   /**
    * Ein Platz je Art der Gegend `realm` (eine Art gilt als gefunden, sobald eines ihrer Tiere gefunden ist), auf der
@@ -44,6 +55,7 @@ export class Album {
     const signed = !!signs && REGIONS.some((r) => r.behind && state.openGates.includes(r.behind));
     const [shown, fold] = signed ? signs.turnAlbum(this.turn, realm, sc.now, sc.reduced) : [realm, 1];
     if (fold <= 0) return;
+    this.icons.begin(ctx, null);
     const groups = slots(state, shown);
     const count = groups.reduce((n, g) => n + g.length, 0) + (signed ? 1 : 0);
     const gap = 6,
@@ -64,7 +76,7 @@ export class Album {
     }
     for (const group of groups) {
       for (const a of group) {
-        slot(ctx, a, x, y, size);
+        slot(ctx, a, x, y, size, this.icons);
         if (a.guest) signs?.realmSign(ctx, a.guest, x + size * 0.2, y + size * 0.36, size * 0.3);
         x += size + gap;
       }
@@ -113,7 +125,7 @@ export function slots(state: State, realm: RegionId): Slot[][] {
 }
 
 /** Ein Platz der Leiste: Grund, Pixel-Rahmen ohne Eckpixel wie auf der Seite, das Tier, Fragezeichen bzw. Herz */
-function slot(ctx: CanvasRenderingContext2D, a: Slot, x: number, y: number, size: number) {
+function slot(ctx: CanvasRenderingContext2D, a: Slot, x: number, y: number, size: number, icons: Sprites) {
   ctx.fillStyle = a.home ? GAME_COLORS.slotHome : a.met ? GAME_COLORS.slotMet : GAME_COLORS.slotEmpty;
   ctx.fillRect(x, y, size, size);
   ctx.fillStyle = GAME_COLORS.ink;
@@ -124,7 +136,22 @@ function slot(ctx: CanvasRenderingContext2D, a: Slot, x: number, y: number, size
   const sp = SPECIES[a.species];
   const s = (size * 1.15) / (0.9 * TILE_W * sp.scale); // Tier füllt den Platz gut zu drei Vierteln
   const P = projection(0.5, 0.5, x + size / 2, y + size * 0.86, s);
-  drawModel(ctx, P, sp.parts, 0.5, 0.5, 0, 'e', sp.scale, a.met ? undefined : GAME_COLORS.silhouette);
+  // gefunden: Verlauf und Oberkante ohne Muster (Symbolgröße); verloren: scharfer Umriss. Einmal gezeichnet, dann als
+  // Bild gesetzt: Die Leiste steht in jedem Bild, fein wären das je Bild rund tausend Zeichenbefehle
+  const mono = a.met ? undefined : GAME_COLORS.silhouette;
+  const key = `album|${a.species}|${modelId(sp.parts)}|${mono ?? 'met'}`;
+  const at = [0.5, 0.5, 0] as const;
+  icons.draw(
+    ctx,
+    P,
+    key,
+    at,
+    modelExtent(sp.parts, sp.scale),
+    (c, Q) => {
+      drawModel(c, Q, sp.parts, ...at, 'e', sp.scale, mono, ICON_PAINTER);
+    },
+    null,
+  );
   if (!a.met) sprite(ctx, ASK, GAME_COLORS.lost, x + size - 7, y + 13, Math.max(1.5, size / 26));
   if (a.follows) sprite(ctx, HEART, GAME_COLORS.heart, x + size - 6, y + 12, Math.max(1.5, size / 22));
 }

@@ -24,7 +24,9 @@ import {
   type GhostInput,
   type Hideout,
 } from './mitwachsen-ghost';
-import { GhostFx, glimmerBoxes, wreathAlpha, wreathBoxes } from './mitwachsen-ghost-look';
+import { GHOST_FOOT, GhostFx, drawGhosts, glimmerBoxes, wreathAlpha, wreathBoxes } from './mitwachsen-ghost-look';
+import { projection } from '../../../../lib/games/front';
+import { anyContext } from '../../test-canvas';
 import { FLOOR, brightness, rgbOf, type Rgb } from './mitwachsen-mask';
 
 const G = GROTTE.ghost;
@@ -335,6 +337,24 @@ describe('Lichtgeister: Bild', () => {
     expect(wreathBoxes(g, 100, false)).not.toEqual(wreathBoxes(g, 700, false));
     expect(wreathAlpha(G.joy * 0.75, true)).toBe(0);
     expect(wreathAlpha(G.joy * 0.25, true)).toBe(1);
+  });
+
+  it('unter dem Geist ein weicher Fleck (`contactShadow`), kein flacher Quader in der Schattenfarbe', () => {
+    const fills: string[] = [];
+    let gradients = 0;
+    const ctx: CanvasRenderingContext2D = anyContext((what) => {
+      if (what === 'fillRect') fills.push(ctx.fillStyle as string);
+      if (what === 'fill') gradients++;
+    });
+    const P = projection(0, 0, 0, 0, 1);
+    drawGhosts(ctx, P, [{ x: 2.5, y: 3.5, z: 1.2, alpha: 1, joy: null }], false, () => true);
+    expect(gradients).toBe(1); // der runde Fleck
+    expect(fills).not.toContain(GROTTE_COLORS.shadow);
+    expect(GHOST_FOOT).toBeCloseTo(0.17);
+    // unsichtbar (alpha 0): kein Fleck, nur Glimmerpünktchen
+    gradients = 0;
+    drawGhosts(ctx, P, [{ x: 2.5, y: 3.5, z: 1.2, alpha: 0, joy: null }], false, () => true);
+    expect(gradients).toBe(0);
   });
 
   it('GhostFx: Töne warten, bis der Kern sie abholt; Altes verfällt', () => {

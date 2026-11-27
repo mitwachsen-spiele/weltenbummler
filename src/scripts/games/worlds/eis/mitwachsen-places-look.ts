@@ -5,7 +5,7 @@
 // sie brennt; kein Feuer, kein Gold. Töne in der C-Pentatonik.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Spielorte im Eis“)
 
-import type { Part } from '../../../../lib/games/front';
+import type { Fine, Part } from '../../../../lib/games/front';
 import { DIGITS } from '../../../../data/games/mitwachsen-digits';
 import { ICE_CRYSTALS } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
 import type { Cell } from '../../mitwachsen-cell';
@@ -26,13 +26,22 @@ export const PLACE_COLORS = {
   on: [ICE_CRYSTALS[1], '#e8fff8'], // Laterne an: Türkis mit hellem Kern
 } as const;
 
+/** Feinheit (Entwurf „Feine Grafik“): Mast aus Holz, Tuch aus Stoff, Haken und Rahmen der Laterne aus Metall, ihr Kristall leuchtet, wenn sie brennt */
+const WOOD: Fine = { skin: 'holz' },
+  CLOTH: Fine = { skin: 'stoff' },
+  IRON: Fine = { skin: 'metall' },
+  GLOW: Fine = { halo: true };
+/** Knauf oben auf dem Mast (Silber, kein Gold: Gold ist die Aktionsfarbe) */
+const KNOB = '#d9dce6';
+
 const PX = 0.08;
-/** Zahlen-Fähnchen (`'numflag'`): Mast, Tuch nach rechts, die Ziffer `note` vorn darauf */
+/** Zahlen-Fähnchen (`'numflag'`): Mast mit Knauf, Tuch nach rechts, die Ziffer `note` vorn darauf (scharf, ohne Muster) */
 export function flagBoxes(c: Cell, x: number, y: number): Box[] {
   const h = c.h;
   const out: Box[] = [
-    [x + 0.16, y + 0.46, h, 0.08, 0.08, 1.4, ...PLACE_COLORS.pole],
-    [x + 0.24, y + 0.47, h + 0.82, 0.5, 0.05, 0.54, ...PLACE_COLORS.cloth],
+    [x + 0.16, y + 0.46, h, 0.08, 0.08, 1.4, ...PLACE_COLORS.pole, undefined, WOOD],
+    [x + 0.15, y + 0.45, h + 1.4, 0.1, 0.1, 0.06, KNOB, KNOB, undefined, IRON],
+    [x + 0.24, y + 0.47, h + 0.82, 0.5, 0.05, 0.54, ...PLACE_COLORS.cloth, undefined, CLOTH],
   ];
   (DIGITS[c.note ?? 0] ?? []).forEach((line, row) =>
     [...line].forEach((ch, col) => {
@@ -60,11 +69,13 @@ export function flagBoxes(c: Cell, x: number, y: number): Box[] {
 const lamp = (lit: boolean): Part[] => {
   const [side, top] = lit ? PLACE_COLORS.on : PLACE_COLORS.off;
   return [
-    [-0.5, -0.03, 0.72, 0.16, 0.06, 0.05, PLACE_COLORS.hook],
-    [-0.5, -0.17, 0.66, 0.34, 0.34, 0.06, PLACE_COLORS.hook], // Deckel und Boden dunkel: So liest man sie auf dem Schnee
-    [-0.5, -0.17, 0.26, 0.34, 0.34, 0.05, PLACE_COLORS.hook],
-    [-0.48, -0.15, 0.31, 0.3, 0.3, 0.35, side, top],
-    ...(lit ? ([[-0.44, -0.08, 0.38, 0.28, 0.16, 0.2, top, top]] as Part[]) : []),
+    [-0.5, -0.03, 0.72, 0.16, 0.06, 0.05, PLACE_COLORS.hook, null, undefined, IRON],
+    [-0.5, -0.17, 0.66, 0.34, 0.34, 0.06, PLACE_COLORS.hook, null, undefined, IRON], // Deckel und Boden dunkel: So liest man sie auf dem Schnee
+    [-0.5, -0.17, 0.26, 0.34, 0.34, 0.05, PLACE_COLORS.hook, null, undefined, IRON],
+    lit
+      ? [-0.48, -0.15, 0.31, 0.3, 0.3, 0.35, side, top, undefined, GLOW]
+      : [-0.48, -0.15, 0.31, 0.3, 0.3, 0.35, side, top],
+    ...(lit ? ([[-0.44, -0.08, 0.38, 0.28, 0.16, 0.2, top, top, undefined, GLOW]] as Part[]) : []),
   ];
 };
 const LAMPS = { aus: lamp(false), an: lamp(true) } as const;
@@ -90,6 +101,7 @@ export function lampBodies(state: State, world: World): readonly RideBody[] {
         z: world.cell(tx, ty).h,
         dir: 's',
         parts: LAMPS[on ? 'an' : 'aus'],
+        foot: 0, // hängt an der Tanne: kein Fleck am Boden
       };
     });
 }

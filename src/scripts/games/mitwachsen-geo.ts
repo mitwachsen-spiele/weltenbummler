@@ -11,7 +11,10 @@ import {
   SRGBColorSpace,
   Vector3,
 } from 'three';
+import type { Fine, HaloAt } from '../../lib/games/front';
 import { hash } from '../../lib/games/rng';
+import { edgeAlpha, edgeVisible, haloCompact, vertexShade, type Corners } from '../../lib/games/shade';
+import { SKINS, SKIN_PERIOD } from '../../lib/games/skins';
 import {
   DIRT,
   GRASS_SIDE,
@@ -203,27 +206,67 @@ export type V3 = [number, number, number];
 export const col = (c: string | Color) =>
   typeof c === 'string' ? new Color(c.replace(/^rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)$/, 'rgb($1,$2,$3)')) : c;
 
+/**
+ * Feinheit einer Fläche für den Shader der feinen Dinge (mitwachsen-fine-3d.ts): Größe in Feldern (u waagerecht entlang
+ * a→b, v entlang a→d), Muster (`SKINS`-Stelle + 1, 0: keins) samt Kacheln je Feld, Deckkraft der hellen Kante (0: keine)
+ */
+type FaceFine = { w: number; h: number; skin: number; per: number; edge: number };
+
 export class Geo {
   private pos: number[] = [];
   private nor: number[] = [];
   private uv: number[] = [];
   private rgb: number[] = [];
   private idx: number[] = [];
+  private fineUv: number[] = [];
+  private skin: number[] = [];
+  private fine = false;
+  /** Leuchten der kompakten Teile mit `halo` (Mitte in der Welt: x, y nach vorn, z Höhe), für den Leuchten-Durchgang */
+  readonly halos: HaloAt[] = [];
 
-  /** Viereck a-b-c-d gegen den Uhrzeigersinn von außen gesehen; a-b unten, c-d oben */
-  quad(a: V3, b: V3, c: V3, d: V3, n: V3, tile: Tile, color: Color) {
+  /**
+   * Viereck a-b-c-d gegen den Uhrzeigersinn von außen gesehen; a-b unten, c-d oben. `corners`: Faktoren je Ecke auf die
+   * Farbe (a, b, c, d; weicher Schatten am Boden), `face`: Feinheit der Fläche (nur Dinge, nie Gelände)
+   */
+  quad(
+    a: V3,
+    b: V3,
+    c: V3,
+    d: V3,
+    n: V3,
+    tile: Tile,
+    color: Color,
+    corners?: readonly [number, number, number, number],
+    face?: FaceFine,
+  ) {
     const base = this.pos.length / 3;
     const [u0, v0, u1, v1] = tileUV(tile);
     for (const p of [a, b, c, d]) this.pos.push(...p);
     for (let i = 0; i < 4; i++) {
+      const k = corners?.[i] ?? 1;
       this.nor.push(...n);
-      this.rgb.push(color.r, color.g, color.b);
+      this.rgb.push(color.r * k, color.g * k, color.b * k);
     }
     this.uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
     this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    // Feinheit je Ecke erst ab der ersten feinen Fläche (davor mit 0 aufgefüllt): Gelände trägt nichts davon
+    if (face && !this.fine) {
+      this.fine = true;
+      this.fineUv = new Array<number>(base * 4).fill(0);
+      this.skin = new Array<number>(base * 3).fill(0);
+    }
+    if (!this.fine) return;
+    const { w = 0, h = 0, skin = 0, per = 0, edge = 0 } = face ?? {};
+    this.fineUv.push(0, 0, w, h, w, 0, w, h, w, h, w, h, 0, h, w, h);
+    for (let i = 0; i < 4; i++) this.skin.push(skin, edge, per);
   }
 
-  /** Quader (x, y = Höhe, z) mit Größe (w, h, d); Seiten und Oberseite einzeln einfärb- und texturierbar */
+  /**
+   * Quader (x, y = Höhe, z) mit Größe (w, h, d); Seiten und Oberseite einzeln einfärb- und texturierbar. Mit `fine` ein
+   * feines Ding (Entwurf „Feine Grafik“): Seiten unten dunkler, Oberseite hinten heller (`vertexShade`), Muster je
+   * Fläche, helle Oberkante, wenn er groß genug ist, und Leuchten kompakter Teile (`halos`). `scale`: Größe, in der das
+   * Modell gezeigt wird (Muster und Kante gleich dicht wie bei Dingen in voller Größe)
+   */
   box(
     x: number,
     y: number,
@@ -235,16 +278,32 @@ export class Geo {
     top?: string | Color | null,
     tile: Tile = 'white',
     topTile?: Tile,
+    fine?: Fine,
+    scale = 1,
   ) {
     const s = col(side),
       t = col(top ?? side);
     const [x0, y0, z0, x1, y1, z1] = [x, y, z, x + w, y + h, z + d];
     const tt = topTile ?? tile;
-    this.quad([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0], tt, t);
-    this.quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], tile, s);
-    this.quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1], tile, s);
-    this.quad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0], tile, s);
-    this.quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0], tile, s);
+    const f = fine && faceOf(fine, edgeVisible(w * scale, d * scale, h * scale));
+    const v = vertexShade(fine?.halo);
+    const sides = fine ? ([v.sideBottom, v.sideBottom, v.sideTop, v.sideTop] as const) : undefined;
+    const tops = fine ? ([v.topFront, v.topFront, v.topBack, v.topBack] as const) : undefined;
+    const at = (fw: number, fh: number, edge = false) =>
+      f && { ...f, w: fw * scale, h: fh * scale, edge: edge ? f.edge : 0 };
+    this.quad([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0], tt, t, tops, at(w, d, true));
+    this.quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], tile, s, sides, at(w, h));
+    this.quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1], tile, s, sides, at(w, h));
+    this.quad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0], tile, s, sides, at(d, h));
+    this.quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0], tile, s, sides, at(d, h));
+    if (fine?.halo && haloCompact(w * scale, d * scale, h * scale))
+      this.halos.push({
+        x: x + w / 2,
+        y: z + d / 2,
+        z: y + h / 2,
+        size: Math.max(w, d, h),
+        color: `#${s.getHexString()}`,
+      });
   }
 
   get empty() {
@@ -257,11 +316,31 @@ export class Geo {
     g.setAttribute('normal', new BufferAttribute(new Float32Array(this.nor), 3));
     g.setAttribute('uv', new BufferAttribute(new Float32Array(this.uv), 2));
     g.setAttribute('color', new BufferAttribute(new Float32Array(this.rgb), 3));
+    // nur, wenn feine Dinge darin sind: Gelände und Torhäuser bleiben, wie sie sind
+    if (this.fine) {
+      g.setAttribute('aFine', new BufferAttribute(new Float32Array(this.fineUv), 4));
+      g.setAttribute('aSkin', new BufferAttribute(new Float32Array(this.skin), 3));
+    }
     g.setIndex(this.idx);
     g.computeBoundingSphere();
     return g;
   }
 }
+
+/** Feinheit der Flächen eines Quaders: Muster und Kacheln je Feld, Kante (nur an der Oberseite, wenn groß genug) */
+function faceOf(fine: Fine, edge: boolean): FaceFine {
+  const skin = fine.skin ? SKINS.indexOf(fine.skin) + 1 : 0;
+  return {
+    w: 0,
+    h: 0,
+    skin,
+    per: fine.skin ? 1 / SKIN_PERIOD[fine.skin] : 0,
+    edge: edge ? edgeAlpha(fine.halo) : 0,
+  };
+}
+
+/** Faktoren der Ecken einer Bodenoberseite (`cornerShade`) in der Reihenfolge, in der `terrain` sie legt */
+export const topCorners = (c: Corners): [number, number, number, number] => [c.x0y1, c.x1y1, c.x1y0, c.x0y0];
 
 // ---------- Licht ----------
 

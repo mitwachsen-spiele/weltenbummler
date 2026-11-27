@@ -4,18 +4,21 @@
 # (2 CPUs, CPUS=4 für den 4-vCPU-Runner). Das echte Spiel rendert dort per Software-WebGL; feste Wartezeiten, die auf
 # 18 Kernen reichen, reißen erst hier. Strenger als die Pipeline: kein Wiederholen fehlgeschlagener Browser-Tests.
 # Die Pipeline verteilt dieselben Schritte auf Jobs: static (Format, Lint, Architektur, Typen), deep (Unit-Tests über
-# alle Seeds), coverage (npm test), build (Build, verify), e2e-site (Projekt site), e2e-game (übrige Projekte, in zwei
-# Teilen per --shard). Hier laufen sie nacheinander, die Browser-Tests in einem Aufruf über alle Projekte; vorher wird
-# geprüft, dass die Pipeline jedes Projekt aus playwright.config.ts aufruft.
+# alle Seeds), coverage (npm test), build (Build, verify), e2e-site (Projekt site), e2e-game (game, pwa-update), e2e-3d
+# (3d, pwa-update-3d, in zwei Teilen per --shard). Hier laufen sie nacheinander, die Browser-Tests in einem Aufruf über
+# alle Projekte; vorher wird geprüft, dass die Pipeline jedes Projekt aus playwright.config.ts aufruft.
 # Geprüft wird der Arbeitsstand samt nicht committeter Änderungen (ohne node_modules und Ignoriertes). Nach einem
 # vollen grünen Lauf steht in .ci-local-ok der Tree-Hash des geprüften Stands – gleich `git rev-parse HEAD^{tree}`,
 # sobald genau dieser Stand committet ist. Der Hook .githooks/pre-push verlangt ihn vor jedem Push.
 # Aufruf: npm run gates:ci [-- <Argumente für playwright test>], etwa `npm run gates:ci -- e2e/pwa.spec.ts` zum schnellen
-# Prüfen oder `-- --project=game --shard=1/2` für einen Teil wie in der Pipeline (schreibt kein .ci-local-ok). Abhängigkeiten liegen in einem Image je package-lock.json, einmal gebaut.
+# Prüfen oder `-- --project=3d --project=pwa-update-3d --shard=1/2` für einen Teil wie in der Pipeline (schreibt kein .ci-local-ok). Abhängigkeiten liegen in einem Image je package-lock.json, einmal gebaut.
 set -euo pipefail
 
 CPUS=${CPUS:-2}
-E2E_WARN=240 # Browser-Tests über 4 min (alle Projekte nacheinander): Warnung, die Jobs der Pipeline haben 8–10 min samt Einrichten
+# Browser-Tests über 7 min (alle Projekte in einem Aufruf): Warnung. Die Pipeline verteilt sie auf e2e-site, e2e-game und
+# e2e-3d (zwei Teile) mit Fristen von 7–8 min samt Einrichten (2,5 × gemessene Dauer); dann die Teile mit Auswahl messen
+# (`-- --project=… --shard=…`). Bis 27.11.2026 4 min, als e2e-game noch alles Spiel in zwei Teilen trug
+E2E_WARN=420
 # Unit-Tests über alle Seeds über 220 s: ROT. Der Job deep hat 8 min samt Einrichten (gut 50 s); auf dem Runner lief
 # test:deep zuletzt etwa ein Drittel langsamer als hier (×1,34). Bis 27.11.2026 lag der Lauf im Job static mit 5 min und
 # durfte hier nur 150 s brauchen (#11)
@@ -119,7 +122,7 @@ if [ "$RC" -eq 0 ] && [ -n "$DEEP" ] && [ "$CPUS" -le 2 ] && [ "$DEEP" -gt "$DEE
   RC=1
 fi
 if [ -n "$E2E" ] && [ "$E2E" -gt "$E2E_WARN" ]; then
-  echo "gates:ci: Warnung – Browser-Tests über $((E2E_WARN / 60)) min, die Jobs der Pipeline haben 8–10 min samt Einrichten" >&2
+  echo "gates:ci: Warnung – Browser-Tests über $((E2E_WARN / 60)) min, die Jobs der Pipeline haben 7–8 min samt Einrichten: Teile mit Auswahl messen" >&2
 fi
 
 if [ "$RC" -ne 0 ]; then

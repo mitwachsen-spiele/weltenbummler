@@ -119,6 +119,8 @@ export const REAR_ROW = Math.round(PARK + 2 * GAP + CAR / 2);
 export const ROLL_IN = 16;
 /** Bei reduzierter Bewegung rückt er beim Bau in Sprüngen so vieler Felder heran */
 const JUMP = 2;
+/** Halbbreite des weichen Flecks unter einem Wagen: so breit wie der Wagen (`RideBody.foot`) */
+export const CAR_FOOT = 0.46;
 /** Kennung der Körper des Zugs (`ride:` trifft das Antippen, wie beim Schlitten) */
 export const TRAIN_ID = 'ride:hoehle';
 /** So lange ploppt der Bahnhof auf (Bruchteil des Baus) */
@@ -210,6 +212,7 @@ function stationParts(
       z: world.cell(...edge).h + rise,
       dir,
       parts: model(k, () => rowParts(i % 2 === 1)),
+      foot: 0, // liegt flach
     };
   });
   const under = st.roof.flatMap((i) => (st.rows[i] ? [st.rows[i].edge, st.rows[i].back] : []));
@@ -226,10 +229,20 @@ function stationParts(
         z,
         dir,
         parts: ROOF,
+        foot: 0, // schwebt
         ...(underRoof(st, state) ? { sheer: true } : {}),
       },
-      { id: 'bahn:pfosten', key: 'bahn:pfosten', x, y, z, dir, parts: ROOF_POSTS },
-      { id: 'bahn:schild', key: 'bahn:schild', ...signAt(x, y, st.side), z: z + ROOF_TOP, dir: 's', parts: SIGN },
+      // Pfosten und Bank stehen hinten, nicht in der Mitte; das Schild steht auf dem Dach: kein Fleck
+      { id: 'bahn:pfosten', key: 'bahn:pfosten', x, y, z, dir, parts: ROOF_POSTS, foot: 0 },
+      {
+        id: 'bahn:schild',
+        key: 'bahn:schild',
+        ...signAt(x, y, st.side),
+        z: z + ROOF_TOP,
+        dir: 's',
+        parts: SIGN,
+        foot: 0,
+      },
     );
   }
   return out;
@@ -409,7 +422,8 @@ function trainParts(st: BearStation, world: World, state: State, work: number | 
     const more = `${look.warm ? 'w' : ''}${look.night ? 'n' : ''}${look.pennant ? 'p' : ''}`;
     const k = `${TRAIN_ID}:${kind}:${+look.tok}${look.door}${+!!look.rider}${look.frame}${+!!look.lit}${more && `:${more}`}`;
     const seat = mid && riding ? { seat: true as const } : {};
-    return [{ id: `${TRAIN_ID}:${kind}`, key: k, x, y, z, dir, parts: model(k, () => carParts(look)), ...seat }];
+    const parts = model(k, () => carParts(look));
+    return [{ id: `${TRAIN_ID}:${kind}`, key: k, x, y, z, dir, parts, foot: CAR_FOOT, ...seat }];
   });
   // Während der Wolke kein Dampf und keine Glühwürmchen: sie springen beim Umdrehen ans andere Ende, und die Kugeln
   // decken nur die Wagen; danach tauchen sie an der neuen Lok und hinter dem neuen letzten Wagen auf
@@ -418,7 +432,7 @@ function trainParts(st: BearStation, world: World, state: State, work: number | 
   if (loco && !at.reduced && !dozing && !night && step === undefined) {
     const phase = Math.floor(at.now / 400) % 4;
     const k = `${TRAIN_ID}:dampf:${phase}`;
-    out.push({ ...loco, id: `${TRAIN_ID}:dampf`, key: k, parts: model(k, () => steamParts(phase)) });
+    out.push({ ...loco, id: `${TRAIN_ID}:dampf`, key: k, parts: model(k, () => steamParts(phase)), foot: 0 });
   }
   out.push(...puffs(place, world, step));
   // Laternenfahrt: Glühwürmchen folgen dem letzten Wagen, solange er in der Höhlenwelt ist
@@ -446,6 +460,7 @@ function puffs(place: Place, world: World, step: number | undefined): RideBody[]
       z,
       dir: 's',
       parts: model(k, () => puffParts(step / PUFF_STEPS)),
+      foot: 0, // die Wagen darunter haben ihren Fleck
     };
   });
 }

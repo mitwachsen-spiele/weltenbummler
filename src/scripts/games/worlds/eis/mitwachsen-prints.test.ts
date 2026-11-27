@@ -5,6 +5,7 @@ import type { World } from '../../mitwachsen-world';
 import { EIS_PACK, worldOf } from '../../test-worlds';
 import { Prints, soft, trail } from './mitwachsen-prints';
 import { MAX_MARKS, OPACITY, layer, printLayer } from './view-3d-prints';
+import { fringeAlpha } from '../../../../lib/games/shade';
 
 const world = worldOf(1);
 
@@ -134,8 +135,13 @@ describe('Fußspuren im Schnee (Eis-Welt, nur Bild)', () => {
     p.draw(ctx, world, P, a[1] + 1); // andere Reihe: nichts
     expect(rects).toEqual([]);
     p.draw(ctx, world, P, a[1]);
-    expect(rects).toHaveLength(2); // zwei Stiefel
-    for (const r of rects) expect(r).toMatch(/^rgba\(84,112,140,0\.420\) [1-9]\d*×[1-9]\d*$/);
+    expect(rects).toHaveLength(4); // zwei Stiefel, je erst der weiche Saum, dann der Abdruck
+    const [outer, inner] = fringeAlpha(0.42);
+    for (const r of rects.slice(0, 2))
+      expect(r).toMatch(new RegExp(`^rgba\\(84,112,140,${outer.toFixed(3)}\\) [1-9]\\d*×[1-9]\\d*$`));
+    for (const r of rects.slice(2))
+      expect(r).toMatch(new RegExp(`^rgba\\(84,112,140,${inner.toFixed(3)}\\) [1-9]\\d*×[1-9]\\d*$`));
+    expect(1 - (1 - outer) * (1 - inner)).toBeCloseTo(0.42, 9); // in der Mitte so deutlich wie ohne Saum
     // 3D: je Teil eines Abdrucks ein Plättchen, höchstens MAX_MARKS
     const l = printLayer(p);
     l.update(world);

@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SPECIES } from '../../data/games/mitwachsen';
 import { ICE_MODELS } from '../../data/games/worlds/eis/mitwachsen-ice-models';
-import { BAT_ROOST, CAVE_MODELS } from '../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { ICE_FINE_MODELS } from '../../data/games/worlds/eis/mitwachsen-ice-fine';
+import { CAVE_MODELS } from '../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { CAVE_FINE_MODELS, CAVE_FINE_ROOST } from '../../data/games/worlds/hoehle/mitwachsen-cave-fine';
 import { PACK_IDS, PACK_WAIT_MS, Packs, RETRY_MS, type LoadedPack } from './mitwachsen-packs';
 import type { Need } from './mitwachsen-pack';
 import { HINT_AFTER } from './mitwachsen-guide';
@@ -109,11 +111,14 @@ describe('Welt-Pakete laden (Packs)', () => {
     expect(typeof packs.get('eis')?.view?.decos.igloo).toBe('function');
   });
 
-  it('mit dem Paket kommen die Modelle der Eis-Tiere (der Kern kennt sie nicht)', async () => {
+  it('mit dem Paket kommen die Modelle der Eis-Tiere (der Kern kennt sie nicht), fein und mit ihrer Grundform', async () => {
     const robbe = SPECIES.robbe.parts;
     SPECIES.robbe.parts = [];
     const packs = new Packs(
-      () => expect(SPECIES.robbe.parts).toBe(ICE_MODELS.robbe), // schon eingetragen, wenn es ankommt
+      () => {
+        expect(SPECIES.robbe.parts).toBe(ICE_FINE_MODELS.robbe); // schon eingetragen, wenn es ankommt
+        expect(SPECIES.robbe.outline).toBe(ICE_MODELS.robbe); // Umriss von „Noch nicht“ aus der Grundform
+      },
       () => Promise.resolve(pack),
     );
     await packs.want(open, gates);
@@ -296,8 +301,9 @@ describe('Welt-Pakete laden (Packs)', () => {
     packs.extra = ['hoehle'];
     await packs.want(bed, gates);
     try {
-      expect(SPECIES.fledermaus.parts).toBe(CAVE_MODELS.fledermaus);
-      expect(SPECIES.fledermaus.roost).toBe(BAT_ROOST);
+      expect(SPECIES.fledermaus.parts).toBe(CAVE_FINE_MODELS.fledermaus); // fein, die Grundform bleibt der Umriss
+      expect(SPECIES.fledermaus.outline).toBe(CAVE_MODELS.fledermaus);
+      expect(SPECIES.fledermaus.roost).toBe(CAVE_FINE_ROOST);
     } finally {
       SPECIES.fledermaus.parts = parts;
       SPECIES.fledermaus.roost = roost;
@@ -308,7 +314,8 @@ describe('Welt-Pakete laden (Packs)', () => {
     const ids = Object.keys(ICE_MODELS) as (keyof typeof ICE_MODELS)[];
     expect(ids).toHaveLength(10);
     for (const id of ids) {
-      expect(SPECIES[id].parts, id).toBe(ICE_MODELS[id]);
+      expect(SPECIES[id].parts, id).toBe(ICE_FINE_MODELS[id]);
+      expect(SPECIES[id].outline, id).toBe(ICE_MODELS[id]);
       expect(SPECIES[id].parts.length, id).toBeGreaterThan(0);
     }
   });

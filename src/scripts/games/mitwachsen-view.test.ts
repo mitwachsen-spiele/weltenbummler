@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { drawDeco, type DecoAt } from './mitwachsen-view';
+import { drawDeco, drawMark, type Box, type DecoAt } from './mitwachsen-view';
+import { MARK_FRINGE } from '../../lib/games/shade';
 import { mapColor } from './mitwachsen-map';
 import { KESSEL_COLORS } from '../../data/games/worlds/eis/mitwachsen-kessel';
 import type { Cell } from './mitwachsen-world';
@@ -46,7 +47,10 @@ describe('Haken der 2D-Ansicht für Welt-Pakete (drawDeco)', () => {
   it('Eiskristall: das Paket zeichnet ihn in seiner Farbe, am Tag blitzt ab und zu ein Funke (nie bei reduzierter Bewegung)', () => {
     const [x, y, crystal] = find('crystal');
     const still = drawDeco(view, world, crystal, x, y, at)!;
-    expect(still.every((b) => b[6] === crystal.color && b[8] === undefined)).toBe(true);
+    const spikes = still.filter((b) => b[6] === crystal.color);
+    expect(spikes).toHaveLength(3); // drei Spitzen, die weich leuchten (`halo`), in 2D ohne Art
+    expect(spikes.every((b) => b[8] === undefined && b[9]?.halo)).toBe(true);
+    expect(still.filter((b) => b[6] !== crystal.color).every((b) => b[6] === '#ffffff')).toBe(true); // Lichtkanten
     const sparks = Array.from({ length: 80 }, (_, i) =>
       drawDeco(view, world, crystal, x, y, { ...at, reduced: false, now: i * 100 })!,
     );
@@ -120,5 +124,39 @@ describe('Haken der 2D-Ansicht für Welt-Pakete (drawDeco)', () => {
     expect(view.ground(slide, 3, 4, false)).toBeNull();
     expect(view.ground(slide, 3, 4, true)?.slice(0, 3)).toEqual([3.12, 4, 1]);
     expect(view.ground({ ...slide, slide: undefined }, 3, 4, true)).toBeNull();
+  });
+});
+
+describe('Flache Marken mit weichem Rand (drawMark)', () => {
+  /** Kontext, der je Füllung die Deckkraft festhält */
+  const recorder = () => {
+    const alphas: number[] = [];
+    const store = new Map<string | symbol, unknown>([['globalAlpha', 1]]);
+    const ctx = new Proxy(
+      {},
+      {
+        get: (_t, k) =>
+          store.has(k)
+            ? store.get(k)
+            : k === 'fill' || k === 'fillRect'
+              ? () => alphas.push(store.get('globalAlpha') as number)
+              : () => {},
+        set: (_t, k, v) => (store.set(k, v), true),
+      },
+    ) as unknown as CanvasRenderingContext2D;
+    return { ctx, alphas };
+  };
+  const P = (x: number, y: number, z: number): [number, number] => [x * 32, y * 16 - z * 16];
+
+  it('zuerst der Saum halb durchsichtig, dann die Marke; über eine ganze Feldlänge in beide Richtungen ohne Saum', () => {
+    const soft = recorder();
+    drawMark(soft.ctx, P, [2, 3.26, 1, 1, 0.12, 0.014, '#b7cde0', '#c9dcec'] as Box);
+    expect(soft.alphas.length).toBeGreaterThan(1);
+    expect(soft.alphas[0]).toBeCloseTo(MARK_FRINGE, 9);
+    expect(soft.alphas.at(-1)).toBe(1);
+    expect(soft.ctx.globalAlpha).toBe(1);
+    const hard = recorder();
+    drawMark(hard.ctx, P, [2, 3, 1, 1, 1, 0.014, '#b7cde0', '#c9dcec'] as Box);
+    expect(hard.alphas.every((a) => a === 1)).toBe(true);
   });
 });
