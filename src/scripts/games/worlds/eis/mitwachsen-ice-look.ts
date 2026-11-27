@@ -10,7 +10,7 @@ import { KESSEL_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kess
 import type { Cell } from '../../mitwachsen-cell';
 import { hash } from '../../../../lib/games/rng';
 import { homeAt, type Realms } from '../../mitwachsen-home';
-import type { Box } from '../../mitwachsen-view';
+import type { Box, Spot } from '../../mitwachsen-view';
 import type { Fine } from '../../../../lib/games/front';
 
 /** Quader in Feldern (mitwachsen-view.ts): Lage, Maße, Farben, Art in 3D (`see` durchsichtig, `sway` im Wind) */
@@ -53,6 +53,36 @@ const WALL = 0.45; // Dicke der Wand
 const STRIP = 0.5; // Tiefe eines Schneeblocks: Jede Reihe besteht aus Streifen, so wird die Kuppel rund
 const LAMP_ROW = 3; // in dieser Reihe hängt innen an der Rückwand das warme Licht
 
+/** Grundriss des Iglus: Mitte (von der Rückwand bis zur Vorderkante des Dachs) und Halbachsen der Kuppel unten */
+function iglooSpan(world: Realms, x: number, y: number) {
+  const { x0, y0, x1, y1 } = homeAt(world, x, y).shelter;
+  return { cx: (x0 + x1 + 1) / 2, cy: (y0 - 1 + y1 + 1) / 2, a: (x1 - x0 + 1) / 2 + 0.3, b: (y1 - y0 + 2) / 2 + 0.2 };
+}
+
+/** Halbbreite (quer, tief) des weichen Flecks unter den kleinen Dingen im Kessel und auf der Schneewiese (Felder) */
+const ICE_FEET: Partial<Record<string, readonly [number, number, number]>> = {
+  fishcrate: [0.51, 0.42, 0.33], // Mitte nach vorn, quer, tief
+  icebowl: [0.5, 0.44, 0.36],
+  watertrough: [0.51, 0.46, 0.38],
+  snowheap: [0.52, 0.42, 0.4],
+};
+
+/**
+ * Weicher Fleck unter einem Ding der Eis-Welt in 2D (in 3D wirft die Sonne den Schatten): unter dem Iglu so groß wie
+ * seine Kuppel unten (nur vom Mittelfeld der Rückwand aus, das es zeichnet), unter Fischkiste, Schale, Trog und
+ * Schneehaufen bzw. Schneemann; null für alles andere (Kristalle leuchten, Fülle liegt flach)
+ */
+export function iceFoot(world: Realms, c: Cell, x: number, y: number): Spot | null {
+  if (c.deco === 'igloo') {
+    const [sx, sy] = homeAt(world, x, y).shelterStem;
+    if (sx !== x || sy !== y) return null;
+    const { cx, cy, a, b } = iglooSpan(world, x, y);
+    return [cx, cy, c.h, 0.9 * a, 0.9 * b];
+  }
+  const f = c.deco && (c.deco !== 'watertrough' || c.biome === 'eis') ? ICE_FEET[c.deco] : undefined;
+  return f ? [x + 0.5, y + f[0], c.h, f[1], f[2]] : null;
+}
+
 /**
  * Iglu über dem Unterstand der Gegend: runde Kuppel aus Reihen von Schneeblöcken, von der Rückwand bis vor das Dach.
  * Unten nur die Wand ringsum, vorn offen (weiter Bogen bis `ARCH`), darüber geschlossene Reihen. Gezeichnet vom
@@ -60,9 +90,7 @@ const LAMP_ROW = 3; // in dieser Reihe hängt innen an der Rückwand das warme L
  * dem Bogen vorn ein heller Sturz, innen an der Rückwand ein kleines warmes Licht (leuchtet, `halo`).
  */
 function igloo(world: Realms, x: number, y: number, h: number): IceBox[] {
-  const { x0, y0, x1, y1 } = homeAt(world, x, y).shelter;
-  const [cx, cy] = [(x0 + x1 + 1) / 2, (y0 - 1 + y1 + 1) / 2]; // von der Rückwand bis zur Vorderkante des Dachs
-  const [a, b] = [(x1 - x0 + 1) / 2 + 0.3, (y1 - y0 + 2) / 2 + 0.2];
+  const { cx, cy, a, b } = iglooSpan(world, x, y);
   const out: IceBox[] = [];
   const lh = IGLOO_H / LAYERS;
   /** halbe Breite einer Ellipse mit Halbachsen (ea, eb) im Abstand dy von der Mitte */

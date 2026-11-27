@@ -8,7 +8,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import { ICE_COLORS, ICE_CRYSTALS, ICE_FLOE } from '../../../../data/games/worlds/eis/mitwachsen-ice-colors';
-import { crystalBoxes, crystalGlint, finTwitch, floeBoxes, floeDrift, iceBoxes } from './mitwachsen-ice-look';
+import { crystalBoxes, crystalGlint, finTwitch, floeBoxes, floeDrift, iceBoxes, iceFoot } from './mitwachsen-ice-look';
 import type { DrawDeco, View2D } from '../../mitwachsen-view';
 import { gateScore, guestAt } from '../../mitwachsen-guest-look';
 import { realmSign, turnAlbum, waitArrow } from './mitwachsen-border-view';
@@ -99,6 +99,7 @@ export const view: View2D = {
     numflag: (_, c, x, y) => flagBoxes(c, x, y), // Zahlen-Fähnchen am Hauptweg
     ...Object.fromEntries(SNOW_FILLS.map((d) => [d, fill])),
   },
+  foot: iceFoot, // weicher Fleck unter Iglu, Fischkiste, Schale, Trog, Schneehaufen
   // Rutschspur zum Schneebett: glänzt, sobald das Eistor offen ist
   ground: (c, x, y, open) =>
     c.rim

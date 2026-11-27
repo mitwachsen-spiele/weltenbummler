@@ -28,7 +28,7 @@ import {
   type GroundEdge,
 } from '../../lib/games/shade';
 import { SKIN_PERIOD, skinPixels, type Skin } from '../../lib/games/skins';
-import type { Box } from './mitwachsen-view';
+import type { Box, Spot } from './mitwachsen-view';
 
 /** Leuchten mit Kennung (für die Auswahl mit Hysterese im Leuchten-Durchgang) */
 export type Halo = HaloAt & { readonly id: string };
@@ -147,7 +147,8 @@ export function glowHalo(pen: Pick<FinePainter, 'halo'>, [x, y, z, w, d, h, colo
 
 /**
  * Weicher runder Fleck auf dem Boden unter einem Körper oder Ding (Mitte cx, cy auf Höhe z), `foot` Halbbreite in
- * Feldern; beim Hüpfen (`lift`, Ebenen) kleiner und blasser, bei reduzierter Bewegung in Stufen
+ * Feldern (oder quer und tief, dann oval); beim Hüpfen (`lift`, Ebenen) kleiner und blasser, bei reduzierter Bewegung in
+ * Stufen
  */
 export function contactShadow(
   ctx: CanvasRenderingContext2D,
@@ -155,14 +156,15 @@ export function contactShadow(
   cx: number,
   cy: number,
   z: number,
-  foot: number,
+  foot: number | readonly [number, number],
   lift = 0,
   reduced = false,
 ) {
-  const r = contactRadius(foot, lift, reduced);
+  const [across, deep] = typeof foot === 'number' ? [foot, foot] : foot;
+  const r = contactRadius(across, lift, reduced);
   const [sx, sy] = P(cx, cy, z);
   const rx = Math.abs(P(cx + r, cy, z)[0] - sx);
-  const ry = Math.abs(P(cx, cy + r, z)[1] - sy);
+  const ry = Math.abs(P(cx, cy + (r * deep) / across, z)[1] - sy);
   if (rx < 0.5 || ry < 0.5) return;
   ctx.save();
   ctx.translate(sx, sy);
@@ -176,6 +178,51 @@ export function contactShadow(
   ctx.beginPath();
   ctx.arc(0, 0, 1, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+/** Reihen (y), über die der Fleck eines Dings reicht: von der hintersten bis zur vordersten */
+export function spotRows([, cy, , across, deep]: Spot): [number, number] {
+  const r = (contactRadius(across) * deep) / across;
+  return [Math.floor(cy - r), Math.ceil(cy + r) - 1];
+}
+
+/**
+ * Flecken, die über mehrere Reihen reichen (Iglu): In jeder Reihe wird nach ihrem Boden nur der Streifen dieser Reihe
+ * gezeichnet, so deckt der Boden davor ihn nicht zu und er legt sich nicht über Dinge dahinter. Ein Fleck in einer Reihe
+ * wird gleich ganz gezeichnet (wie unter Bäumen)
+ */
+export class FootSpots {
+  private list: { spot: Spot; last: number }[] = [];
+
+  begin() {
+    this.list = [];
+  }
+
+  /** Fleck eines Dings in Reihe `y` (beim Zeichnen der Dinge dieser Reihe, nach ihrem Boden) */
+  place(ctx: CanvasRenderingContext2D, P: Projection, spot: Spot, y: number) {
+    const [, last] = spotRows(spot);
+    if (last <= y) return void contactShadow(ctx, P, spot[0], spot[1], spot[2], [spot[3], spot[4]]);
+    stripe(ctx, P, spot, y);
+    this.list.push({ spot, last });
+  }
+
+  /** Streifen der Flecken in Reihe `y`, nach ihrem Boden und vor ihren Dingen */
+  row(ctx: CanvasRenderingContext2D, P: Projection, y: number) {
+    for (const { spot, last } of this.list) if (y <= last) stripe(ctx, P, spot, y);
+  }
+}
+
+/** Den Streifen des Flecks in Reihe `y` zeichnen (auf der Höhe des Flecks) */
+function stripe(ctx: CanvasRenderingContext2D, P: Projection, spot: Spot, y: number) {
+  const [cx, cy, z, across, deep] = spot;
+  const top = P(cx, y, z)[1];
+  const bottom = P(cx, y + 1, z)[1];
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-1e5, top, 2e5, bottom - top);
+  ctx.clip();
+  contactShadow(ctx, P, cx, cy, z, [across, deep]);
   ctx.restore();
 }
 
@@ -225,9 +272,12 @@ export function edgeShade(
 /** Ausdehnung eines Bilds um seinen Ankerpunkt, in Feldern: links, rechts, hinten, vorn, unten, oben */
 export type Extent = readonly [number, number, number, number, number, number];
 
-type Sprite = { canvas: HTMLCanvasElement; ox: number; oy: number; halos: HaloAt[]; scale: number };
+type Sprite = { canvas: HTMLCanvasElement; ox: number; oy: number; halos: HaloAt[]; scale: number; frame: number };
 
-/** Höchstens so viele Bilder (danach fliegt das am längsten ungenutzte raus) */
+/**
+ * Höchstens so viele Bilder (danach fliegt das am längsten ungenutzte raus). Bilder des laufenden Bilds bleiben: zeigt der
+ * Schirm mehr Dinge (4K, Ultrawide), wächst der Cache für dieses Bild darüber, statt jedes Bild neu zu zeichnen
+ */
 export const SPRITE_LIMIT = 480;
 /**
  * Höchstens so viele Geräte-Pixel in allen Bildern zusammen (24 MPx, rund 96 MB): Safari auf dem iPad begrenzt den
@@ -244,6 +294,7 @@ export class Sprites {
   private dpr = 1;
   private world: unknown = null;
   private pixels = 0;
+  private frame = 0;
   constructor(
     private readonly limit = SPRITE_LIMIT,
     private readonly maxPixels = SPRITE_PIXELS,
@@ -260,6 +311,7 @@ export class Sprites {
 
   /** Zu Beginn eines Bilds: Geräte-Pixel je CSS-Pixel aus dem Kontext; eine neue Welt leert den Cache */
   begin(ctx: CanvasRenderingContext2D, world: unknown) {
+    this.frame++;
     this.dpr = ctx.getTransform?.().a || 1;
     if (world !== this.world) while (this.map.size) this.drop();
     this.world = world;
@@ -291,11 +343,18 @@ export class Sprites {
       s = render(at, extent, scale, paint);
       this.map.set(id, s);
       this.pixels += s.canvas.width * s.canvas.height;
-      while (this.map.size > 1 && (this.map.size > this.limit || this.pixels > this.maxPixels)) this.drop();
+      while (this.map.size > 1 && (this.pixels > this.maxPixels || (this.map.size > this.limit && this.stale())))
+        this.drop();
     }
+    s.frame = this.frame;
     const [sx, sy] = P(...at);
     ctx.drawImage(s.canvas, sx - s.ox / dpr, sy - s.oy / dpr, s.canvas.width / dpr, s.canvas.height / dpr);
     if (pen) for (const h of s.halos) pen.halo({ ...h, x: h.x + at[0], y: h.y + at[1], z: h.z + at[2] });
+  }
+
+  /** Das am längsten ungenutzte Bild stammt aus einem früheren Bild (sonst wäre es im laufenden schon gebraucht) */
+  private stale() {
+    return this.map.values().next().value!.frame < this.frame;
   }
 
   /** Das am längsten ungenutzte Bild entfernen und seinen Speicher sofort freigeben (Safari wartet sonst lange) */
@@ -362,5 +421,5 @@ function render(
   paintWith(c, pen);
   paint(c, P, pen);
   const halos = pen.take().map((h) => ({ ...h, x: h.x - at[0], y: h.y - at[1], z: h.z - at[2] }));
-  return { canvas, ox, oy, halos, scale };
+  return { canvas, ox, oy, halos, scale, frame: 0 };
 }

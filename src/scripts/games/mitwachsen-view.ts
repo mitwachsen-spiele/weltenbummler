@@ -168,6 +168,11 @@ export function railsOrder(
 /** Weicher Fleck am Boden unter einem Teil des Gleises: Mitte (x, y), Höhe des Bodens, Halbbreite */
 export type RailFoot = readonly [number, number, number, number];
 /**
+ * Weicher Fleck am Boden unter einem Ding eines Welt-Pakets (nur 2D; in 3D macht das die Sonne): Mitte (x, y), Höhe des
+ * Bodens, Halbbreite quer und tief (Felder). Er darf über mehrere Reihen reichen (Iglu): `FootSpots` in mitwachsen-fine-2d.ts
+ */
+export type Spot = readonly [number, number, number, number, number];
+/**
  * Ab `low` steht ein Teil des Gleises (Prellbock, Pfeiler des Tunnelportals; Schwellen sind flacher), bis `long` ist es
  * kompakt; unter `full` (Höhe des Prellbocks) wird sein Fleck mit der Höhe kleiner, so schrumpft er beim Versinken stetig
  */
@@ -218,6 +223,11 @@ export type View2D = {
    * `evening` golden-orange), sonst null
    */
   ground(c: Cell, x: number, y: number, open: boolean, evening?: number): Box | null;
+  /**
+   * Weicher Fleck unter einem Ding dieser Welt in 2D (Eis-Welt: Iglu, Fischkiste, Schneehaufen, Schale, Trog), sonst null.
+   * Die Grotte hat keinen: Ihre Dinge leuchten, der Kontrast bleibt (Regel „Farben der Grotte“)
+   */
+  foot?(world: World, c: Cell, x: number, y: number): Spot | null;
   /** Gleis auf Feldern mit Strecke (Paket der Bahn) */
   rails?: DrawRails;
   sky?: Sky;

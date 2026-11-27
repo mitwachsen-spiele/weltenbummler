@@ -21,7 +21,8 @@ import { HILL_FLAG, TUBE_COLORS, tubeParts } from '../../../../data/games/worlds
 import { SNOWMAN_COLORS } from '../../../../data/games/worlds/eis/mitwachsen-kessel';
 import type { Cell } from '../../mitwachsen-cell';
 import { EIS_PACK, worldOf } from '../../test-worlds';
-import { EDGE, IGLOO_LIGHT, crystalBoxes, floeBoxes, iceBoxes } from './mitwachsen-ice-look';
+import { EDGE, IGLOO_LIGHT, crystalBoxes, floeBoxes, iceBoxes, iceFoot } from './mitwachsen-ice-look';
+import { view } from './view-2d';
 import { snowBoxes } from './mitwachsen-snowman-look';
 import { chimeBoxes } from './mitwachsen-chime-look';
 import { crestBoxes } from './mitwachsen-ice-rim';
@@ -83,6 +84,35 @@ describe('Feinheit der Eis-Welt (Entwurf „Feine Grafik“)', () => {
     expect(inside(blocks, lintel)).toEqual([]);
     expect(blocks.some((b) => touching(b, lintel[0]!))).toBe(true); // vorn auf dem Block über dem Bogen
     expect(lintel[0]![8]).toBe('see'); // wird mit dem Iglu vor der Figur durchsichtig
+  });
+
+  it('2D: weicher Fleck unter Iglu (so groß wie die Kuppel unten), Fischkiste, Schale, Trog, Schneehaufen', () => {
+    const [sx, sy] = world.homes.eis.shelterStem;
+    expect(view.foot?.(world, world.cell(sx, sy), sx, sy)).toEqual(iceFoot(world, world.cell(sx, sy), sx, sy)); // die 2D-Ansicht meldet ihn
+    const blocks = iceBoxes(world, world.cell(sx, sy), sx, sy)!.filter((b) => skinOf(b) === 'eisblock');
+    const ground = blocks.filter((b) => Math.abs(b[2] - world.cell(sx, sy).h) < 1e-9); // unterste Reihe der Kuppel
+    const [[x0, x1], [y0, y1]] = hull(ground) as [[number, number], [number, number]];
+    const spot = iceFoot(world, world.cell(sx, sy), sx, sy)!;
+    const [cx, cy, z, across, deep] = spot;
+    expect(cx).toBeCloseTo((x0 + x1) / 2, 1);
+    expect(cy).toBeCloseTo((y0 + y1) / 2, 0);
+    expect(z).toBe(world.cell(sx, sy).h);
+    // der Fleck reicht etwas über den Fuß der Kuppel hinaus (Radius ×1,35), ist aber nicht viel größer
+    expect(across).toBeGreaterThan(0.7 * ((x1 - x0) / 2));
+    expect(across).toBeLessThan((x1 - x0) / 2);
+    expect(deep).toBeGreaterThan(0.7 * ((y1 - y0) / 2));
+    // die anderen Felder des Iglus werfen keinen eigenen
+    expect(iceFoot(world, world.cell(sx + 1, sy), sx + 1, sy)).toBeNull();
+    for (const deco of ['fishcrate', 'icebowl', 'watertrough', 'snowheap'] as const) {
+      const f = iceFoot(world, ice({ deco }), 3, 4)!;
+      expect(f[0]).toBe(3.5);
+      expect(f[1]).toBeGreaterThan(4.45);
+      expect(f[3]).toBeLessThan(0.5); // bleibt etwa im Feld
+    }
+    // Wassertrog außerhalb der Eis-Welt: der Kern (`SHADOW`); Kristalle leuchten, Fülle liegt flach: kein Fleck
+    expect(iceFoot(world, ice({ deco: 'watertrough', biome: undefined }), 3, 4)).toBeNull();
+    expect(iceFoot(world, ice({ deco: 'crystal' }), 3, 4)).toBeNull();
+    expect(iceFoot(world, ice({ deco: 'snowdrift' }), 3, 4)).toBeNull();
   });
 
   it('Fischkiste aus Holz mit Nägeln vorn, Schnee auf dem Rand, glänzende Fische; Schale und Trog aus Eisblock', () => {

@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { TILE_D, TILE_W, box, drawModel, paintWith, projection, type Part } from '../../lib/games/front';
+import { LEVEL_H, TILE_D, TILE_W, box, drawModel, paintWith, projection, type Part } from '../../lib/games/front';
 import { SPECIES } from '../../data/games/mitwachsen';
 import { CONTACT_KNEE, EDGE_STRIP, contactRadius, faceShade } from '../../lib/games/shade';
 import { SKIN_PERIOD } from '../../lib/games/skins';
 import {
   Fine2D,
+  FootSpots,
   ICON_PAINTER,
   SPRITE_LIMIT,
   SPRITE_PIXELS,
@@ -15,6 +16,7 @@ import {
   edgeStrip,
   glowHalo,
   modelExtent,
+  spotRows,
 } from './mitwachsen-fine-2d';
 import type { Box } from './mitwachsen-view';
 
@@ -36,6 +38,9 @@ function recorder(scale = 1) {
       log.push(`fill ${name(ctx.fillStyle)} ${[x, y, w, h].map((v) => +v.toFixed(2)).join(',')}`),
     strokeRect: () => log.push('stroke'),
     beginPath: () => {},
+    rect: (x: number, y: number, w: number, h: number) =>
+      log.push(`rect ${[x, y, w, h].map((v) => +v.toFixed(2)).join(',')}`),
+    clip: () => log.push('clip'),
     arc: () => log.push('arc'),
     fill: () => log.push(`fillpath ${name(ctx.fillStyle)}`),
     createPattern: (img: unknown) => ({
@@ -175,6 +180,38 @@ describe('Weicher Fleck und Schatten am Boden in 2D', () => {
     expect(tiny.log).toEqual([]); // kleiner als ein halbes Pixel: nichts
   });
 
+  it('zeichnet den Fleck oval, wenn ein Ding quer und tief verschieden breit ist (Bett, Trog, Iglu)', () => {
+    const { ctx, log } = recorder();
+    contactShadow(ctx, P, 1, 1, 0, [0.4, 0.2]);
+    const r = contactRadius(0.4);
+    expect(log).toContain(`scale ${+(r * TILE_W).toFixed(2)},${+((r / 2) * TILE_D).toFixed(2)}`);
+  });
+
+  it('Flecken über mehrere Reihen (Iglu): je Reihe nach ihrem Boden nur ihr Streifen, einer in einer Reihe gleich ganz', () => {
+    expect(spotRows([2.5, 3.5, 1, 0.3, 0.3])).toEqual([3, 3]);
+    expect(spotRows([2.5, 3.5, 1, 1.2, 1.4])).toEqual([1, 5]);
+    const spots = new FootSpots();
+    spots.begin();
+    const one = recorder();
+    spots.place(one.ctx, P, [2.5, 3.5, 1, 0.3, 0.3], 3);
+    expect(one.log.filter((l) => l === 'fillpath radial')).toHaveLength(1);
+    expect(one.log).not.toContain('clip');
+    const { ctx, log } = recorder();
+    spots.place(ctx, P, [2.5, 3.5, 1, 1.2, 1.4], 2); // Rückwand in Reihe 2, Fleck bis Reihe 5
+    const strips = () => log.filter((l) => l.startsWith('rect'));
+    expect(strips()).toEqual([`rect -100000,${2 * TILE_D - LEVEL_H},200000,${TILE_D}`]);
+    for (let y = 3; y <= 7; y++) spots.row(ctx, P, y);
+    // Reihen 3, 4, 5 je ein Streifen (eine Reihe tief, geschnitten), danach nichts mehr
+    expect(strips()).toHaveLength(4);
+    expect(strips()[3]).toBe(`rect -100000,${5 * TILE_D - LEVEL_H},200000,${TILE_D}`);
+    expect(log.filter((l) => l === 'clip')).toHaveLength(4);
+    expect(log.filter((l) => l === 'fillpath radial')).toHaveLength(4);
+    // ein neues Bild vergisst die Flecken des vorigen
+    spots.begin();
+    spots.row(ctx, P, 4);
+    expect(strips()).toHaveLength(4);
+  });
+
   it('legt den Streifen von der Kante nach innen, quer dazu über das ganze Feld', () => {
     expect(edgeStrip(3, 4, [-1, 0])).toEqual([
       [3, 4.5],
@@ -307,10 +344,36 @@ describe('Bild-Cache der feinen Dinge', () => {
     let painted = 0;
     const paint = () => void painted++;
     const ext = [0.5, 0.5, 0.5, 0.5, 0, 1] as const;
-    for (const k of ['a', 'b', 'a', 'c', 'a', 'b']) sprites.draw(ctx, P, k, [0, 0, 0], ext, paint, pen);
+    for (const k of ['a', 'b', 'a', 'c', 'a', 'b']) {
+      sprites.begin(ctx, 'w'); // je ein Bild
+      sprites.draw(ctx, P, k, [0, 0, 0], ext, paint, pen);
+    }
     expect(sprites.size).toBe(2);
     expect(painted).toBe(4); // a, b, c, und b noch einmal (a blieb, weil es gebraucht wurde)
     expect(SPRITE_LIMIT).toBeGreaterThan(100);
+  });
+
+  it('verdrängt keine Bilder des laufenden Bilds: mehr Dinge als die Grenze werden nicht jedes Bild neu gezeichnet', () => {
+    const sprites = new Sprites(3);
+    const { ctx } = recorder();
+    const pen = new Fine2D();
+    let painted = 0;
+    const paint = () => void painted++;
+    const ext = [0.5, 0.5, 0.5, 0.5, 0, 1] as const;
+    const keys = ['a', 'b', 'c', 'd', 'e'];
+    const frame = () => {
+      sprites.begin(ctx, 'w');
+      for (const k of keys) sprites.draw(ctx, P, k, [0, 0, 0], ext, paint, pen);
+    };
+    frame();
+    expect(painted).toBe(5);
+    expect(sprites.size).toBe(5); // wächst für dieses Bild über die Grenze
+    frame();
+    expect(painted).toBe(5); // im zweiten Bild nichts neu
+    // zeigt der Schirm wieder weniger, schrumpft der Cache beim nächsten neuen Bild auf die Grenze
+    sprites.begin(ctx, 'w');
+    sprites.draw(ctx, P, 'f', [0, 0, 0], ext, paint, pen);
+    expect(sprites.size).toBe(3);
   });
 });
 

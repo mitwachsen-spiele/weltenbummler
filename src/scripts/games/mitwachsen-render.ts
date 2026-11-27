@@ -93,7 +93,16 @@ import { hangAt, labelHeight } from './mitwachsen-roost';
 import { isRing } from './mitwachsen-rim';
 import { PAL_RING, rimBlossoms } from './mitwachsen-rim-look';
 import { workOf } from './mitwachsen-herald';
-import { Fine2D, Sprites, boxesExtent, contactShadow, edgeShade, glowHalo, modelExtent } from './mitwachsen-fine-2d';
+import {
+  Fine2D,
+  FootSpots,
+  Sprites,
+  boxesExtent,
+  contactShadow,
+  edgeShade,
+  glowHalo,
+  modelExtent,
+} from './mitwachsen-fine-2d';
 import { HaloPass, type HaloLit, type HaloView } from './mitwachsen-halo';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
@@ -138,11 +147,21 @@ export type Scene = {
   rides: readonly RideBody[]; // Fahrzeug aus einem Welt-Paket (Schlitten, Zugtier, Laternenpfahl; die Figur sitzt darin)
 };
 
-/** Weicher Fleck unter Dingen in 2D: Mitte (Felder nach vorn) und Halbbreite des Fußes */
-const SHADOW: Partial<Record<Deco, readonly [number, number]>> = {
+/**
+ * Weicher Fleck unter Dingen in 2D (in 3D macht das die Sonne): Mitte (Felder nach vorn) und Halbbreite des Fußes (oder
+ * quer und tief). Die Dinge der Welt-Pakete melden ihren selbst (`View2D.foot`)
+ */
+const SHADOW: Partial<Record<Deco, readonly [number, number | readonly [number, number]]>> = {
   tree: [0.55, 0.45],
   bush: [0.55, 0.36],
   boulder: [0.55, 0.32],
+  bed: [0.52, [0.46, 0.44]],
+  cactus: [0.5, 0.26],
+  trough: [0.51, [0.46, 0.38]],
+  watertrough: [0.51, [0.46, 0.38]],
+  bigshroom: [0.5, 0.3],
+  shelterpilz: [0.5, 0.42],
+  sign: [0.5, 0.14], // Pfosten der Tafel
 };
 /** Anstieg des Blicks je Feld nach vorn in 2D (für die Verdeckung der Leuchten): Tiefe einer Reihe in Ebenen */
 const RISE_2D = TILE_D / LEVEL_H;
@@ -193,6 +212,7 @@ export class Renderer {
   private things = rowCache(); // Quader der Dinge je Feld, geklemmt und sortiert (nicht jedes Bild neu)
   private fine = new Fine2D(); // Muster und Verlauf der Dinge, sammelt das Leuchten
   private sprites = new Sprites(); // Dinge und Modelle als Bild je Maßstab (mitwachsen-fine-2d.ts)
+  private spots = new FootSpots(); // Flecken über mehrere Reihen (Iglu)
   private halos = new HaloPass(); // Leuchten über allem (mitwachsen-halo.ts)
   private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Torplatte; nachgeladen)
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'ring' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
@@ -242,12 +262,14 @@ export class Renderer {
     this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked, packs: state.packs, work: workOf(state) };
     paintWith(ctx, this.fine); // Dinge fein; Gelände, Böden und Torhäuser zeichnen ausdrücklich flach
     this.sprites.begin(ctx, world);
+    this.spots.begin();
     this.roof = 1 - (1 - ROOF_LEFT) * openRoof(world, state.player.x, state.player.y).open;
     this.guest = this.guestAt(world, state);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
       for (const b of marks.get(y) ?? []) if (sc.explored(Math.floor(b[0]), y)) drawMark(ctx, P, b); // weicher Rand
       for (const v of this.views.values()) v.trail?.draw(ctx, world, P, y); // Fußspuren im Schnee (aus dem Welt-Paket)
+      this.spots.row(ctx, P, y);
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
       for (const b of this.later)
         if (Math.ceil(b[1] + b[4] - 1e-6) - 1 === y) {
@@ -687,7 +709,14 @@ export class Renderer {
     // ein Block
     const ice = c.biome ? drawDeco(this.views.get(c.biome) ?? null, world, c, x, y, this.at) : null;
     // gezeichnet erst in der Reihe ihrer Vorderkante: sonst deckte der Boden der Reihen davor die Kuppel unten zu
-    if (ice) return void this.later.push(...ice);
+    if (ice) {
+      const spot = this.views.get(c.biome!)?.foot?.(world, c, x, y);
+      if (spot) this.spots.place(ctx, P, spot, y); // weicher Fleck darunter
+      return void this.later.push(...ice);
+    }
+    const under = c.deco ? SHADOW[c.deco] : undefined;
+    // das Höhlenbett in der Grotte ohne (Kontrast, „Mit Verlauf“)
+    if (under && !(c.deco === 'bed' && c.biome === 'hoehle')) contactShadow(ctx, P, x + 0.5, y + under[0], h, under[1]);
     // Hängt nur an Feld, Ding und Beeren (Nachbarn von Hecke und Zaun, Unterstand stehen mit der Welt fest)
     const key = `${c.deco},${c.tree},${c.h},${c.color},${`${x},${y}` in state.picked}`;
     const things = this.things(world, x, y, key, () => {
@@ -696,8 +725,6 @@ export class Renderer {
       return boxes && (c.deco === 'shelterpilz' ? sortBoxes(boxes) : clampRow(boxes, y));
     });
     if (things) {
-      const under = c.deco ? SHADOW[c.deco] : undefined;
-      if (under) contactShadow(ctx, P, x + 0.5, y + under[0], h, under[1]);
       // der Hut am Unterstand ist durchscheinend, solange die Figur zu Hause ist (`openRoof`): Quader einzeln
       if (c.deco === 'shelterpilz') {
         for (const b of things) {
