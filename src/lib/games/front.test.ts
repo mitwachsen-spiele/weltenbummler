@@ -129,6 +129,21 @@ describe('Quader von vorn: flach und fein', () => {
     expect(big.log.find((l) => l.startsWith('stroke'))).toContain(' 1.8 ');
   });
 
+  it('misst die Breite der Oberkante am Quader, nicht am Ursprung (Perspektive über 3D)', () => {
+    // Perspektive: je weiter vom Auge (y), desto kleiner; der Ursprung liegt fast im Auge und wäre riesig
+    const eye = -0.02;
+    const persp: typeof P = (x, y, z) => {
+      const k = 1 / (y - eye);
+      return [x * TILE_W * k, (y * TILE_D - z * LEVEL_H) * k];
+    };
+    const { ctx, log } = recorder();
+    box(ctx, persp, 3, 4, 0, 0.5, 0.5, 0.5, '#000000', null, undefined, painter().p);
+    const local = (1 / (4 - eye)) * 1; // ein Feld am Quader in Kacheln
+    const width = +log.find((l) => l.startsWith('stroke'))!.split(' ')[2]!;
+    expect(width).toBeCloseTo(Math.max(0.6, 0.9 * local));
+    expect(width).toBeLessThan(1);
+  });
+
   it('meldet kompakte leuchtende Teile mit Mitte und Größe, lange Streifen nicht', () => {
     const { ctx, log } = recorder();
     const { p, halos } = painter();

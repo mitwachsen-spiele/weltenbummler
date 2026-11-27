@@ -197,8 +197,9 @@ export function box(
   ctx.fillStyle = color;
   ctx.fillRect(ax, by, bx - ax, cy - by);
   pen.face(ctx, { x: ax, y: by, w: bx - ax, h: cy - by, lu: w, lv: h, side: true }, fine);
-  const scale = (P(1, 0, 0)[0] - P(0, 0, 0)[0]) / TILE_W;
   if (edgeVisible(w, d, h)) {
+    // Maßstab am Quader selbst: in der Perspektive über 3D (Fledermaus, Olm) liegt der Ursprung weit weg von der Kamera
+    const scale = Math.abs(P(x0 + 1, y0, z0 + h)[0] - ax) / TILE_W;
     ctx.strokeStyle = `rgba(255,255,255,${edgeAlpha(fine?.halo)})`;
     ctx.lineWidth = edgeWidth(scale);
     ctx.strokeRect(ax, ay, bx - ax, by - ay);
