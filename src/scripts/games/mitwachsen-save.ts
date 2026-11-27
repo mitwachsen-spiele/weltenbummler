@@ -50,7 +50,7 @@ export type Index = {
   current: string | null;
 };
 
-export const DEFAULT_FIGURE = 'Bobo';
+export const DEFAULT_FIGURE = 'Jonas';
 export const MAX_NAME = 16;
 
 /** Namen säubern: Buchstaben, Ziffern, Leerzeichen und wenige Satzzeichen, gekürzt */
