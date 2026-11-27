@@ -3,8 +3,8 @@
 # (.github/workflows/deploy.yml), aber nacheinander in einem Docker-Container mit so wenig Rechenkraft wie der Runner
 # (2 CPUs, CPUS=4 für den 4-vCPU-Runner). Das echte Spiel rendert dort per Software-WebGL; feste Wartezeiten, die auf
 # 18 Kernen reichen, reißen erst hier. Strenger als die Pipeline: kein Wiederholen fehlgeschlagener Browser-Tests.
-# Die Pipeline verteilt dieselben Schritte auf Jobs: static (Format, Lint, Architektur, Typen, Unit-Tests über alle
-# Seeds), coverage (npm test), build (Build, verify), e2e-site (Projekt site), e2e-game (übrige Projekte, in zwei
+# Die Pipeline verteilt dieselben Schritte auf Jobs: static (Format, Lint, Architektur, Typen), deep (Unit-Tests über
+# alle Seeds), coverage (npm test), build (Build, verify), e2e-site (Projekt site), e2e-game (übrige Projekte, in zwei
 # Teilen per --shard). Hier laufen sie nacheinander, die Browser-Tests in einem Aufruf über alle Projekte; vorher wird
 # geprüft, dass die Pipeline jedes Projekt aus playwright.config.ts aufruft.
 # Geprüft wird der Arbeitsstand samt nicht committeter Änderungen (ohne node_modules und Ignoriertes). Nach einem
@@ -16,9 +16,10 @@ set -euo pipefail
 
 CPUS=${CPUS:-2}
 E2E_WARN=240 # Browser-Tests über 4 min (alle Projekte nacheinander): Warnung, die Jobs der Pipeline haben 8–10 min samt Einrichten
-# Unit-Tests über alle Seeds über 150 s: ROT. Der Job static hat 5 min samt Einrichten (gut 50 s) und den übrigen Gates;
-# auf dem Runner lief test:deep zuletzt langsamer als hier (am 23.11.2026 hier 203 s grün, dort nach 5 min abgebrochen)
-DEEP_MAX=150
+# Unit-Tests über alle Seeds über 220 s: ROT. Der Job deep hat 8 min samt Einrichten (gut 50 s); auf dem Runner lief
+# test:deep zuletzt etwa ein Drittel langsamer als hier (×1,34). Bis 27.11.2026 lag der Lauf im Job static mit 5 min und
+# durfte hier nur 150 s brauchen (#11)
+DEEP_MAX=220
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
 
@@ -75,7 +76,7 @@ if [ "$NODE_HAVE" != "${NODE_WANT%%.*}" ]; then
   echo "gates:ci: Warnung – Node $NODE_HAVE im Image, die Pipeline nutzt $NODE_WANT (.nvmrc)" >&2
 fi
 
-# Im Container: die Schritte der Pipeline-Jobs nacheinander, je mit Dauer (test:deep aus static, `npm test` aus coverage)
+# Im Container: die Schritte der Pipeline-Jobs nacheinander, je mit Dauer (test:deep aus deep, `npm test` aus coverage)
 # shellcheck disable=SC2016
 INNER='
 set -uo pipefail
@@ -114,7 +115,7 @@ E2E=$(sed -n 's/^::: e2e *\([0-9]*\)s.*/\1/p' "$TMP/log")
 DEEP=$(sed -n 's/^::: test:deep *\([0-9]*\)s.*/\1/p' "$TMP/log")
 echo "gates:ci: gesamt ${TOTAL}s, Unit-Tests über alle Seeds ${DEEP:-–}s, Browser-Tests ${E2E:-–}s ($CPUS CPUs)"
 if [ "$RC" -eq 0 ] && [ -n "$DEEP" ] && [ "$CPUS" -le 2 ] && [ "$DEEP" -gt "$DEEP_MAX" ]; then
-  echo "gates:ci: test:deep dauert ${DEEP}s, erlaubt sind ${DEEP_MAX}s – sonst bricht der Job static nach 5 min ab. Seed-Bereiche teilen oder verkleinern, nicht die Frist anheben" >&2
+  echo "gates:ci: test:deep dauert ${DEEP}s, erlaubt sind ${DEEP_MAX}s – sonst wird es im Job deep (8 min) eng. Seed-Bereiche teilen oder verkleinern, nicht die Frist anheben" >&2
   RC=1
 fi
 if [ -n "$E2E" ] && [ "$E2E" -gt "$E2E_WARN" ]; then
