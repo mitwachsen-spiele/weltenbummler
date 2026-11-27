@@ -104,6 +104,8 @@ export function spiderParts({ pose, lift }: Hang): readonly Part[] {
     p[5] * S,
     p[6],
     p[7],
+    p[8],
+    p[9], // Feinheit (Muster, Leuchten) bleibt
   ]);
   const top = lift + 0.3 * S;
   const thread: Part = [0.14, -0.015, top, 0.03, 0.03, Math.max(0.02, WEB_TOP - top), C.thread, C.thread];

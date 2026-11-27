@@ -4,6 +4,8 @@
 
 import type { Grid, Palette } from '../voxel/textures';
 import { hash } from './rng';
+import { edgeAlpha, edgeVisible, edgeWidth, haloCompact } from './shade';
+import type { Skin } from './skins';
 
 export const TILE_W = 64; // Breite eines Feldes
 export const TILE_D = 44; // Tiefe der Oberseite (verkürzt)
@@ -86,8 +88,15 @@ export const DIRS: Record<Dir, [number, number]> = { e: [1, 0], w: [-1, 0], s: [
 const RIGHT: Record<Dir, [number, number]> = { e: [0, 1], w: [0, -1], s: [-1, 0], n: [1, 0] };
 
 /**
+ * Feinheit eines Teils (Entwurf „Feine Grafik“): Muster der Oberfläche (`skin`) und ob es als kompaktes Teil leuchtet
+ * (`halo`: Lampe, Kristall, Pilz; hat nichts mit der Art `'glow'` des Polarlichts zu tun). Verlauf und helle Oberkante
+ * bekommt jedes Ding ohnehin, sobald ein `FinePainter` zeichnet.
+ */
+export type Fine = { readonly skin?: Skin; readonly halo?: true };
+
+/**
  * Teil eines Modells, in Zellen relativ zur Mitte des Modells: [vorn, rechts, unten, Länge, Breite, Höhe, Farbe,
- * Farbe der Oberseite?, Fläche?]. „Fläche“ markiert Augen: Sie werden nur gezeichnet, wenn ihre Fläche
+ * Farbe der Oberseite?, Fläche?, Feinheit?]. „Fläche“ markiert Augen: Sie werden nur gezeichnet, wenn ihre Fläche
  * (vorn, rechts oder links) zur Kamera zeigt – sonst schimmerten sie durch den Kopf.
  */
 export type Part = readonly [
@@ -100,9 +109,35 @@ export type Part = readonly [
   string,
   (string | null)?,
   ('f' | 'r' | 'l')?,
+  Fine?,
 ];
 
-/** Quader von vorn: Oberseite und Vorderseite */
+/** Fläche eines Quaders auf dem Bild (Pixel) samt ihrer Größe in Feldern: u waagerecht, v von oben nach unten */
+export type FaceRect = {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+  readonly lu: number;
+  readonly lv: number;
+  /** Seite (Vorderseite) statt Oberseite */
+  readonly side: boolean;
+};
+
+/**
+ * Maler der feinen Dinge, hereingereicht von der Ansicht (die Muster liegen dort, `lib` kennt keinen Browser-Code):
+ * `face` legt Muster und Verlauf über eine schon gefüllte Fläche, `halo` merkt sich das Leuchten eines kompakten
+ * Teils (Mitte und Größe in Pixeln, Farbe), das die Ansicht später in einem eigenen Durchgang zeichnet.
+ */
+export interface FinePainter {
+  face(ctx: CanvasRenderingContext2D, face: FaceRect, fine: Fine | undefined): void;
+  halo?(x: number, y: number, size: number, color: string): void;
+}
+
+/**
+ * Quader von vorn: Oberseite und Vorderseite. Ohne `painter` flach wie immer; mit ihm fein (Muster und Verlauf je
+ * Fläche, helle Oberkante, Leuchten kompakter Teile mit `halo`).
+ */
 export function box(
   ctx: CanvasRenderingContext2D,
   P: Projection,
@@ -114,21 +149,43 @@ export function box(
   h: number,
   color: string,
   top?: string | null,
+  fine?: Fine,
+  painter?: FinePainter,
 ) {
   const [ax, ay] = P(x0, y0, z0 + h);
   const [bx, by] = P(x0 + w, y0 + d, z0 + h);
   const [, cy] = P(x0, y0 + d, z0);
   ctx.fillStyle = top ?? color;
   ctx.fillRect(ax, ay, bx - ax, by - ay);
-  ctx.fillStyle = 'rgba(255,255,255,.05)';
-  ctx.fillRect(ax, ay, bx - ax, by - ay);
+  if (!painter) {
+    ctx.fillStyle = 'rgba(255,255,255,.05)';
+    ctx.fillRect(ax, ay, bx - ax, by - ay);
+    ctx.fillStyle = color;
+    ctx.fillRect(ax, by, bx - ax, cy - by);
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    ctx.fillRect(ax, by, bx - ax, cy - by);
+    return;
+  }
+  painter.face(ctx, { x: ax, y: ay, w: bx - ax, h: by - ay, lu: w, lv: d, side: false }, fine);
   ctx.fillStyle = color;
   ctx.fillRect(ax, by, bx - ax, cy - by);
-  ctx.fillStyle = 'rgba(0,0,0,.18)';
-  ctx.fillRect(ax, by, bx - ax, cy - by);
+  painter.face(ctx, { x: ax, y: by, w: bx - ax, h: cy - by, lu: w, lv: h, side: true }, fine);
+  const scale = (P(1, 0, 0)[0] - P(0, 0, 0)[0]) / TILE_W;
+  if (edgeVisible(w, d, h)) {
+    ctx.strokeStyle = `rgba(255,255,255,${edgeAlpha(fine?.halo)})`;
+    ctx.lineWidth = edgeWidth(scale);
+    ctx.strokeRect(ax, ay, bx - ax, by - ay);
+  }
+  if (fine?.halo && painter.halo && haloCompact(w, d, h)) {
+    const [mx, my] = P(x0 + w / 2, y0 + d / 2, z0 + h / 2);
+    painter.halo(mx, my, Math.max(w, d, h) * TILE_W * scale, color);
+  }
 }
 
-/** Modell an (cx, cy) auf Höhe z zeichnen, gedreht in Richtung dir. `mono` färbt alles ein (Umriss). */
+/**
+ * Modell an (cx, cy) auf Höhe z zeichnen, gedreht in Richtung dir. `mono` färbt alles ein (Umriss, bleibt scharf:
+ * ohne Muster und Verlauf). `painter` zeichnet die Teile fein.
+ */
 export function drawModel(
   ctx: CanvasRenderingContext2D,
   P: Projection,
@@ -139,6 +196,7 @@ export function drawModel(
   dir: Dir,
   scale = 1,
   mono?: string,
+  painter?: FinePainter,
 ) {
   const [fx, fy] = DIRS[dir];
   const [rx, ry] = RIGHT[dir];
@@ -151,9 +209,10 @@ export function drawModel(
     h: number;
     c: string;
     t?: string | null;
+    fine?: Fine | undefined;
     k: number;
   }[] = [];
-  for (const [f, r, zz, fl, rw, h, color, top, face] of parts) {
+  for (const [f, r, zz, fl, rw, h, color, top, face, fine] of parts) {
     if (face) {
       const n = face === 'f' ? [fx, fy] : face === 'r' ? [rx, ry] : [-rx, -ry];
       if (n[1] !== 1) continue; // nur Flächen, die zur Kamera zeigen
@@ -178,11 +237,13 @@ export function drawModel(
       h: bh,
       c: mono ?? color,
       t: mono ?? top,
+      fine,
       k: (y + d / 2) * 100 + bz + bh / 2 + (face ? 50 : 0),
     });
   }
   boxes.sort((a, b) => a.k - b.k);
-  for (const b of boxes) box(ctx, P, b.x, b.y, b.z, b.w, b.d, b.h, b.c, b.t);
+  const pen = mono ? undefined : painter;
+  for (const b of boxes) box(ctx, P, b.x, b.y, b.z, b.w, b.d, b.h, b.c, b.t, b.fine, pen);
 }
 
 /** Augenpaar für einen Kopf: vorn mittig sowie an beiden Seiten nahe der Vorderkante */
