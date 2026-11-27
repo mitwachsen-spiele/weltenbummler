@@ -13,14 +13,15 @@
 // Teil des Welt-Pakets der Höhlenwelt.
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Schmuck der Grotte“)
 
-import { drawModel, type Dir, type Projection } from '../../../../lib/games/front';
-import { CAVE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { drawModel, paintWith, painterOf, type Dir, type Part, type Projection } from '../../../../lib/games/front';
+import { CAVE_FINE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-fine';
 import { CAVE_SPECIES } from '../../../../data/games/mitwachsen-hoehle';
 import { GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import type { Sky } from '../../mitwachsen-view';
 import { drawBox } from '../../mitwachsen-view';
 import type { SkyScene } from '../../mitwachsen-sky';
 import type { World } from '../../mitwachsen-world';
+import { Fine2D, Sprites, modelExtent } from '../../mitwachsen-fine-2d';
 import { columnBoxes } from './mitwachsen-cave-look';
 import type { Chime } from './mitwachsen-chime-look';
 import type { Drips } from './mitwachsen-drips';
@@ -50,6 +51,8 @@ export type CaveFx = {
   mask?: MaskFx;
   spark?: Spark;
   ghost?: GhostFx;
+  /** Bild-Cache der feinen Modelle in der Luft (Grottenolm, Fledermaus) in 2D, beim ersten Bild angelegt */
+  sprites?: Sprites;
 };
 
 const [WATER, WATER_TOP] = GROTTE_COLORS.water;
@@ -91,11 +94,12 @@ export function circleNow(
 export function caveWeather(fx: CaveFx): Sky['weather'] {
   return (ctx, world, sc: CaveScene, P, state) => {
     // Abend (und Schlaf im Höhlenbett): Fledermäuse fliegen Runden um den Schacht über dem Bett; in 3D Abendlicht
+    const model = fineModels(ctx, world, fx, sc, P);
     const fly = (x: number, y: number, z: number, dir: Dir) =>
-      drawModel(ctx, P, CAVE_MODELS.fledermaus, x, y, z, dir, CAVE_SPECIES.fledermaus.scale);
+      model(CAVE_FINE_MODELS.fledermaus, 'fledermaus', x, y, z, dir, CAVE_SPECIES.fledermaus.scale);
     fx.dusk = drawDusk(ctx, world, P, sc, state, fly);
     const seen = (x: number, y: number) => sc.explored(Math.round(x), Math.round(y));
-    air(ctx, world, fx, sc, P, seen);
+    air(ctx, world, fx, sc, P, seen, model);
     caveMask(ctx, world, sc, P, state, (fx.mask ??= { fade: {} }), fx.light.since);
     const me = sc.bodies?.get('player');
     const circle = me ? circleNow(world, state, fx, sc.now, sc.reduced) : null;
@@ -118,6 +122,39 @@ export function caveWeather(fx: CaveFx): Sky['weather'] {
   };
 }
 
+/** Zeichnet ein Modell in der Luft fein: Teile, Kennung (für den Bild-Cache), Mitte, Höhe, Richtung, Größe */
+type ModelPen = (parts: readonly Part[], id: string, x: number, y: number, z: number, dir: Dir, scale: number) => void;
+/** Maler der Modelle in der Luft (ihre Leuchten zählen nicht: keins von ihnen leuchtet) */
+const PEN = new Fine2D();
+
+/**
+ * Modelle in der Luft der Grotte fein zeichnen (Entwurf „Feine Grafik“): in 2D aus dem Bild-Cache (`Sprites`, je Modell,
+ * Richtung und Größe einmal gezeichnet, wie die Tiere), in 3D auf der Ebene direkt mit dem Maler (der Cache zeichnet von
+ * vorn, die 3D-Projektion ist geneigt; es sind höchstens drei Modelle je Bild)
+ */
+function fineModels(ctx: CanvasRenderingContext2D, world: World, fx: CaveFx, sc: CaveScene, P: Projection): ModelPen {
+  if (sc.lit3d)
+    return (parts, _id, x, y, z, dir, scale) => {
+      const before = painterOf(ctx);
+      paintWith(ctx, PEN);
+      drawModel(ctx, P, parts, x, y, z, dir, scale);
+      paintWith(ctx, before ?? null);
+      PEN.take(); // nichts davon leuchtet
+    };
+  const sprites = (fx.sprites ??= new Sprites(24));
+  sprites.begin(ctx, world);
+  return (parts, id, x, y, z, dir, scale) =>
+    sprites.draw(
+      ctx,
+      P,
+      `${id}|${dir}|${scale.toFixed(3)}`,
+      [x, y, z],
+      modelExtent(parts, scale),
+      (c, Q) => drawModel(c, Q, parts, x, y, z, dir, scale),
+      null,
+    );
+}
+
 /** Was zur Welt gehört und unter der Maske liegt: der fallende Tropfen, der Grottenolm, die Fledermaus auf ihrer Runde */
 function air(
   ctx: CanvasRenderingContext2D,
@@ -126,6 +163,7 @@ function air(
   sc: CaveScene,
   P: Projection,
   seen: (x: number, y: number) => boolean,
+  model: ModelPen,
 ) {
   const drop = sc.reduced ? null : fx.drips.falling(sc.now);
   if (drop && !drop.far && seen(drop.x, drop.y))
@@ -133,7 +171,7 @@ function air(
   const olm = fx.olm.now(world, sc.now, sc.reduced);
   if (olm && seen(olm.x, olm.y)) {
     const { x, y, z } = olm;
-    drawModel(ctx, P, CAVE_MODELS.grottenolm, x + 0.5, y + 0.5, z, 's', CAVE_SPECIES.grottenolm.scale);
+    model(CAVE_FINE_MODELS.grottenolm, 'grottenolm', x + 0.5, y + 0.5, z, 's', CAVE_SPECIES.grottenolm.scale);
     // die Oberfläche des Wassers über seinem Bauch, dazu ein Ring, der sich weitet (nicht bei reduzierter Bewegung)
     ctx.globalAlpha = 0.6;
     drawBox(ctx, P, [x + 0.1, y + 0.55, -0.01, 0.8, 0.4, 0.02, WATER, WATER_TOP]);
@@ -144,7 +182,7 @@ function air(
   }
   const bat = sc.reduced ? null : fx.chime.bat(world, sc.now);
   if (bat && seen(bat.x, bat.y))
-    drawModel(ctx, P, CAVE_MODELS.fledermaus, bat.x, bat.y, bat.z, bat.dir, CAVE_SPECIES.fledermaus.scale);
+    model(CAVE_FINE_MODELS.fledermaus, 'fledermaus', bat.x, bat.y, bat.z, bat.dir, CAVE_SPECIES.fledermaus.scale);
 }
 
 /** Der Tropfen der fernen Tropfquelle als Glitzern: hell, etwas größer als ein Tropfen, mit einem Schimmer quer */
@@ -168,7 +206,7 @@ function glows(
     const c = world.cell(x, y);
     if (c.deco !== 'column' || !seen(x, y)) continue;
     ctx.globalAlpha = 0.55 * g;
-    drawBox(ctx, P, columnBoxes(c, x, y, 1)[1]);
+    for (const b of columnBoxes(c, x, y, 1)) if (b[9]?.halo) drawBox(ctx, P, b); // Säule und Spitze
     ctx.globalAlpha = 1;
   }
 }

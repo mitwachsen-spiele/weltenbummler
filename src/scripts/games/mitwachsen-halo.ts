@@ -2,7 +2,8 @@
 // weichen Schein. Ein Durchgang auf der Ebene über dem Bild, gleich für 2D und 3D (dort mit der Projektion der
 // 3D-Ansicht): nach Dunkelmaske und Nacht, so liegt das Leuchten nie unter der Maske der Grotte. Nur auf erkundeten
 // Feldern, höchstens `HALO_LIMIT` nahe der Figur (mit Hysterese, nichts springt beim Laufen), gedämpft hinter Hügeln
-// und Baumkronen, nicht doppelt auf Lichtinseln der Grotte (`Cell.light`). Hat nichts mit der Art `'glow'` zu tun.
+// und Baumkronen, nicht doppelt auf Lichtinseln der Grotte (`Cell.light`), in der Grotte leiser (`HALO_CAVE`: dort
+// leuchtet fast alles, die Dunkelmaske soll Dunkel bleiben). Hat nichts mit der Art `'glow'` zu tun.
 // Spezifikation: docs/specs/mitwachsen.md (Feinheit)
 
 import type { HaloAt, Projection } from '../../lib/games/front';
@@ -20,6 +21,8 @@ export const riseOf = (tiltDeg: number): number => Math.tan((tiltDeg * Math.PI) 
 export const RISE_3D = riseOf(TILT_DEG[0]);
 /** So viel bleibt von einem Leuchten hinter einem Hügel oder einer Baumkrone */
 export const HALO_HIDDEN = 0.25;
+/** So viel bleibt von einem Leuchten in der Kristallgrotte (Felder der Gegend `hoehle`) */
+export const HALO_CAVE = 0.6;
 /** Kleinster Radius in Pixeln (winzige Teile leuchten noch sichtbar) */
 const MIN_PX = 6;
 
@@ -74,7 +77,7 @@ export type HaloScene = {
   readonly explored: (x: number, y: number) => boolean;
   readonly night: number;
   readonly focus: readonly [number, number];
-  readonly cell: (x: number, y: number) => Pick<Cell, 'h' | 'ground' | 'deco' | 'light'>;
+  readonly cell: (x: number, y: number) => Pick<Cell, 'h' | 'ground' | 'deco' | 'light' | 'region'>;
   /** Woher die Kamera schaut, und der Nebelrand (siehe `HaloView`) */
   readonly view: HaloView;
 };
@@ -94,8 +97,10 @@ export class HaloPass {
     const base = haloAlpha(sc.night);
     const height = (x: number, y: number) => standing(sc.cell(x, y));
     return picked.map((h) => {
-      const veil = sc.view.seen?.(Math.floor(h.x), Math.floor(h.y)) ?? 1; // am Nebelrand so verhüllt wie das Ding
-      return { h, alpha: base * veil * (hidden(height, h.x, h.y, h.z, sc.view) ? HALO_HIDDEN : 1) };
+      const [cx, cy] = [Math.floor(h.x), Math.floor(h.y)];
+      const veil = sc.view.seen?.(cx, cy) ?? 1; // am Nebelrand so verhüllt wie das Ding
+      const cave = sc.cell(cx, cy).region === 'hoehle' ? HALO_CAVE : 1;
+      return { h, alpha: base * veil * cave * (hidden(height, h.x, h.y, h.z, sc.view) ? HALO_HIDDEN : 1) };
     });
   }
 

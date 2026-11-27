@@ -18,6 +18,9 @@ import type { Box } from '../../mitwachsen-view';
 import type { World } from '../../mitwachsen-world';
 import type { Scored } from '../../sfx';
 import { TOWER, awake, towerAt } from './mitwachsen-cave-places';
+import { CAVE_FINE, EDGE, lighten } from './mitwachsen-cave-fine';
+
+const { stem: STEM, cap: CAP, glow: GLOW, glowCap: GLOW_CAP } = CAVE_FINE;
 
 export const CAVE_PLACE_COLORS = {
   stem: GROTTE_COLORS.bright,
@@ -28,26 +31,35 @@ export const CAVE_PLACE_COLORS = {
   echo: GROTTE_COLORS.bright,
   arc: GROTTE_COLORS.rock,
   white: '#ffffff',
+  ring: '#c9bfae', // Kragen am Stiel, etwas dunkler als der Stiel
 } as const;
 
 /** Farbe eines Dings je Feld: eine der drei Kristallfarben */
 const tint = (x: number, y: number) => CAVE_PLACE_COLORS.caps[hash(13, x, y) % CAVE_PLACE_COLORS.caps.length]!;
 
-/** Leuchtpilz: Stiel, breiter Hut, Kuppe; `lit`: wach, der Hut leuchtet mit hellen Tupfen */
+/**
+ * Leuchtpilz: Stiel (fein mit Fasern), breiter Hut, Kuppe; `lit`: wach, der Hut leuchtet mit hellen Tupfen (die Kuppe
+ * leuchtet weich in den Raum, `halo`); schlafend ist der Hut matter Lack. Unter dem Hut ein dunkler Kragen am Stiel
+ */
 export function shroomBoxes(c: Cell, x: number, y: number, lit: boolean): Box[] {
   const h = c.h;
   const [side, top] = lit ? [tint(x, y), tint(x, y)] : CAVE_PLACE_COLORS.asleep;
   const glow = lit ? 'glow' : undefined;
+  // in der Reihenfolge des Zeichnens in 2D: der Kragen vor dem Hut (der Hut deckt ihn oben zu), die Tupfen vor der
+  // Kuppe (sie stecken mit einer Ecke darunter)
+  const dots: Box[] = lit
+    ? [
+        [x + 0.2, y + 0.6, h + 0.76, 0.12, 0.12, 0.02, CAVE_PLACE_COLORS.white, CAVE_PLACE_COLORS.white, 'glow'],
+        [x + 0.66, y + 0.3, h + 0.76, 0.12, 0.12, 0.02, CAVE_PLACE_COLORS.white, CAVE_PLACE_COLORS.white, 'glow'],
+      ]
+    : [];
   const out: Box[] = [
-    [x + 0.38, y + 0.38, h, 0.24, 0.24, 0.5, ...CAVE_PLACE_COLORS.stem],
-    [x + 0.1, y + 0.1, h + 0.5, 0.8, 0.8, 0.26, side, top, glow],
-    [x + 0.26, y + 0.26, h + 0.76, 0.48, 0.48, 0.16, side, top, glow],
+    [x + 0.38, y + 0.38, h, 0.24, 0.24, 0.5, ...CAVE_PLACE_COLORS.stem, undefined, STEM],
+    [x + 0.36, y + 0.62, h + 0.42, 0.28, EDGE, 0.06, CAVE_PLACE_COLORS.ring, CAVE_PLACE_COLORS.ring], // Kragen vorn
+    [x + 0.1, y + 0.1, h + 0.5, 0.8, 0.8, 0.26, side, top, glow, lit ? GLOW : CAP],
+    ...dots,
+    [x + 0.26, y + 0.26, h + 0.76, 0.48, 0.48, 0.16, side, top, glow, lit ? GLOW_CAP : CAP],
   ];
-  if (lit)
-    out.push(
-      [x + 0.2, y + 0.6, h + 0.76, 0.12, 0.12, 0.02, CAVE_PLACE_COLORS.white, CAVE_PLACE_COLORS.white, 'glow'],
-      [x + 0.66, y + 0.3, h + 0.76, 0.12, 0.12, 0.02, CAVE_PLACE_COLORS.white, CAVE_PLACE_COLORS.white, 'glow'],
-    );
   return out;
 }
 
@@ -62,32 +74,44 @@ const SPIRES = [
   [0.36, 0.36, 0.28, 0.95],
   [0.36, 0.36, 0.28, 1.4],
 ] as const;
-/** Kristallhaufen bzw. Türmchen in seiner Stufe (0 Bruchstücke … `TOWER` fertig, die Spitze leuchtet) */
+/**
+ * Kristallhaufen bzw. Türmchen in seiner Stufe (0 Bruchstücke … `TOWER` fertig, die Spitze leuchtet). Die Reihenfolge
+ * ist die des Zeichnens in 2D: was hinten steht, zuerst (das hintere Bruchstück, die Kristalle neben der Säule), dann
+ * die Säule mit Lichtkante und Spitze, zuletzt die Bruchstücke vorn
+ */
 export function towerBoxes(c: Cell, x: number, y: number, stage: number): Box[] {
   const h = c.h;
   const color = tint(x, y);
-  const out: Box[] = SHARDS.map(([dx, dy, w, hh]): Box => [x + dx, y + dy, h, w, w, hh, ...CAVE_PLACE_COLORS.shard]);
+  const [front, back] = [SHARDS.slice(0, 2), SHARDS.slice(2)].map((list) =>
+    list.map(([dx, dy, w, hh]): Box => [x + dx, y + dy, h, w, w, hh, ...CAVE_PLACE_COLORS.shard]),
+  ) as [Box[], Box[]];
   const spire = SPIRES[Math.min(TOWER, stage) - 1];
-  if (!spire) return out;
+  if (!spire) return [...back, ...front];
   const [dx, dy, w, hh] = spire;
-  out.push([x + dx, y + dy, h, w, w, hh, color, color]);
-  if (stage >= 2) out.push([x + 0.2, y + 0.44, h, 0.18, 0.18, hh * 0.55, color, color]);
+  // fein: die Kristalle leuchten (halb so stark schattiert, kompakte weich in den Raum), vorn eine Lichtkante
+  const beside: Box[] = [];
+  if (stage >= 2)
+    beside.push([x + 0.2, y + 0.44, h, 0.18, 0.18, hh * 0.55, color, lighten(color, 0.3), undefined, GLOW]);
   if (stage >= TOWER)
-    out.push(
-      [x + 0.6, y + 0.3, h, 0.18, 0.18, hh * 0.7, color, color],
-      [
-        x + dx + 0.06,
-        y + dy + 0.06,
-        h + hh,
-        w - 0.12,
-        w - 0.12,
-        0.16,
-        CAVE_PLACE_COLORS.white,
-        CAVE_PLACE_COLORS.white,
-        'glow',
-      ],
-    );
-  return out;
+    beside.push([x + 0.6, y + 0.3, h, 0.18, 0.18, hh * 0.7, color, lighten(color, 0.3), undefined, GLOW]);
+  const column: Box[] = [
+    [x + dx, y + dy, h, w, w, hh, color, color, undefined, GLOW],
+    [x + dx + 0.05, y + dy + w, h + hh * 0.4, 0.04, EDGE, hh * 0.45, CAVE_PLACE_COLORS.white, CAVE_PLACE_COLORS.white],
+  ];
+  if (stage >= TOWER)
+    column.push([
+      x + dx + 0.06,
+      y + dy + 0.06,
+      h + hh,
+      w - 0.12,
+      w - 0.12,
+      0.16,
+      CAVE_PLACE_COLORS.white,
+      CAVE_PLACE_COLORS.white,
+      'glow',
+      GLOW, // die fertige Spitze leuchtet weich in den Raum
+    ]);
+  return [...back, ...beside, ...column, ...front];
 }
 
 const PX = 0.12;
@@ -143,6 +167,7 @@ export function glowBodies(state: State, world: World): readonly RideBody[] {
       dir: 's',
       parts: [],
       beacon: true,
+      foot: 0, // ohne Teile kein Fleck am Boden
     }));
 }
 
@@ -161,6 +186,7 @@ export function echoGlow(state: State, world: World): readonly RideBody[] {
       dir: 's',
       parts: [],
       beacon: true,
+      foot: 0, // ohne Teile kein Fleck am Boden
     }));
 }
 

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SPECIES } from '../../data/games/mitwachsen';
 import { ICE_MODELS } from '../../data/games/worlds/eis/mitwachsen-ice-models';
 import { ICE_FINE_MODELS } from '../../data/games/worlds/eis/mitwachsen-ice-fine';
-import { BAT_ROOST, CAVE_MODELS } from '../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { CAVE_MODELS } from '../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { CAVE_FINE_MODELS, CAVE_FINE_ROOST } from '../../data/games/worlds/hoehle/mitwachsen-cave-fine';
 import { PACK_IDS, PACK_WAIT_MS, Packs, RETRY_MS, type LoadedPack } from './mitwachsen-packs';
 import type { Need } from './mitwachsen-pack';
 import { HINT_AFTER } from './mitwachsen-guide';
@@ -300,8 +301,9 @@ describe('Welt-Pakete laden (Packs)', () => {
     packs.extra = ['hoehle'];
     await packs.want(bed, gates);
     try {
-      expect(SPECIES.fledermaus.parts).toBe(CAVE_MODELS.fledermaus);
-      expect(SPECIES.fledermaus.roost).toBe(BAT_ROOST);
+      expect(SPECIES.fledermaus.parts).toBe(CAVE_FINE_MODELS.fledermaus); // fein, die Grundform bleibt der Umriss
+      expect(SPECIES.fledermaus.outline).toBe(CAVE_MODELS.fledermaus);
+      expect(SPECIES.fledermaus.roost).toBe(CAVE_FINE_ROOST);
     } finally {
       SPECIES.fledermaus.parts = parts;
       SPECIES.fledermaus.roost = roost;

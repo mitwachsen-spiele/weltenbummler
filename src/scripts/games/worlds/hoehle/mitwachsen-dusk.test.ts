@@ -1,13 +1,14 @@
 // Abend in der Kristallgrotte (Schritt 13, Schmuck mit Zug): Lichtschächte golden-orange (in 2D am Boden, `ground`; in
 // 3D auf der Ebene darüber), Fledermaus-Runden um den Schacht über dem Höhlenbett, am Abend und im Schlaf im Höhlenbett
 // (mitwachsen-dusk-look.ts, gezeichnet von `caveWeather`)
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Projection } from '../../../../lib/games/front';
 import { GROTTE } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import type { SkyScene } from '../../mitwachsen-sky';
 import { initialState, type State } from '../../mitwachsen-state';
 import { kesselPlace } from '../../mitwachsen-world';
 import { HOEHLE_PACK, worldOf } from '../../test-worlds';
+import { fakeDocument } from '../../test-canvas';
 import { Chime } from './mitwachsen-chime-look';
 import { caveWeather, type CaveFx } from './mitwachsen-cave-sky';
 import { Drips } from './mitwachsen-drips';
@@ -27,12 +28,17 @@ import { glowOver } from './mitwachsen-cave-look';
 import { Olm } from './mitwachsen-olm-look';
 import { fx, ground, view } from './view-2d';
 
+// Ohne Browser: Die Fledermäuse kommen fein aus dem Bild-Cache, dafür Canvas als Attrappe
+let restore = () => {};
+beforeAll(() => void (restore = fakeDocument()));
+afterAll(() => restore());
+
 const W = worldOf(1, [HOEHLE_PACK]);
 const cells = kesselPlace(1, HOEHLE_PACK).cells.map((p) => ({ p, c: W.cell(...p) }));
 const P: Projection = (x, y, z) => [x * 10, (y - z) * 10];
 const canvas = () => {
   const fills: string[] = [];
-  const raw = { globalAlpha: 1, fillStyle: '', fillRect: () => void fills.push(raw.fillStyle) };
+  const raw = { globalAlpha: 1, fillStyle: '', fillRect: () => void fills.push(raw.fillStyle), drawImage: () => {} };
   return { ctx: raw as unknown as CanvasRenderingContext2D, fills };
 };
 

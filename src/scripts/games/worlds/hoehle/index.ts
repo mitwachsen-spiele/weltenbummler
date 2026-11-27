@@ -28,7 +28,8 @@ import { rules } from './mitwachsen-cave-rules';
 import { HEAVE } from './mitwachsen-heave';
 import { SIGHTS } from './mitwachsen-sights';
 import { view } from './view-2d';
-import { BAT_ROOST, CAVE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { CAVE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { CAVE_FINE_MODELS, CAVE_FINE_ROOST } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-fine';
 
 export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules, Vehicle, Sight> = {
   id: 'hoehle',
@@ -39,6 +40,7 @@ export const pack: WorldPack<GuideRules, View2D, View3D, RideEngine, HeraldRules
   sights: SIGHTS, // Laterne, Säulen-Glockenspiel, Netze und Steg locken, bis sie gefunden sind
   view,
   view3d: () => import('./view-3d').then((m) => m.view3d),
-  models: CAVE_MODELS,
-  roosts: { fledermaus: BAT_ROOST }, // kopfüber im Kristallbogen
+  models: CAVE_FINE_MODELS, // fein (Fell, Lack, Krallen …), mitwachsen-cave-fine.ts
+  roosts: { fledermaus: CAVE_FINE_ROOST }, // kopfüber im Kristallbogen
+  outlines: CAVE_MODELS, // Grundform ohne Feinteile: Umriss von „Noch nicht“ bleibt
 };

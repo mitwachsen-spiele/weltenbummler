@@ -24,6 +24,7 @@ import {
   contactRadius,
   faceShade,
   groundEdges,
+  haloCompact,
   type GroundEdge,
 } from '../../lib/games/shade';
 import { SKIN_PERIOD, skinPixels, type Skin } from '../../lib/games/skins';
@@ -131,6 +132,15 @@ export class Fine2D implements FinePainter {
     this.halos = [];
     return out;
   }
+}
+
+/**
+ * Leuchten eines Quaders, der scharf (ohne Maler) gezeichnet wird – Art `'glow'`, etwa die Kuppe eines wachen
+ * Leuchtpilzes –, beim Maler `pen` melden wie `box` es mit Maler täte: nur mit `halo` und nur kompakt
+ */
+export function glowHalo(pen: Pick<FinePainter, 'halo'>, [x, y, z, w, d, h, color, , , fine]: Box) {
+  if (fine?.halo && haloCompact(w, d, h))
+    pen.halo?.({ x: x + w / 2, y: y + d / 2, z: z + h / 2, size: Math.max(w, d, h), color });
 }
 
 // ---------- Weicher Fleck ----------

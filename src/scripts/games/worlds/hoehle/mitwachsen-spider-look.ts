@@ -12,7 +12,7 @@
 
 import type { Part, Projection } from '../../../../lib/games/front';
 import type { Point } from '../../../../data/games/mitwachsen';
-import { SPIDER_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { SPIDER_FINE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-fine';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import type { Cell } from '../../mitwachsen-cell';
 import type { RideBody } from '../../mitwachsen-ride-view';
@@ -95,7 +95,7 @@ export function spiderParts({ pose, lift }: Hang): readonly Part[] {
   const known = partsOf.get(k);
   if (known) return known;
   const S = SPIDER_SCALE;
-  const body = SPIDER_MODELS[pose].map((p): Part => [
+  const body = SPIDER_FINE_MODELS[pose].map((p): Part => [
     p[0] * S,
     p[1] * S,
     p[2] * S + lift,
@@ -161,6 +161,7 @@ export class SpiderFx {
         z: world.cell(x, y).h,
         dir: 's',
         parts: spiderParts(hang),
+        foot: 0, // sie hängt am Netz: kein weicher Fleck am Boden
       };
     });
   }

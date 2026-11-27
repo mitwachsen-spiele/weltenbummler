@@ -3,6 +3,7 @@ import { SPECIES, animalId, regionAnimalList, REGIONS } from '../../../../data/g
 import { CAVE_SPECIES } from '../../../../data/games/mitwachsen-hoehle';
 import { CAVE_ANIMALS, ARCH_PERCH } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-animals';
 import { BAT_ROOST, CAVE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { CAVE_FINE_MODELS, CAVE_FINE_ROOST } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-fine';
 import { GROTTE } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { initialState, step, type State } from '../../mitwachsen-state';
 import { meadowSpots } from '../../mitwachsen-meadow';
@@ -214,11 +215,13 @@ describe('Fledermäuse hängen kopfüber im Kristallbogen', () => {
     expect(roostAt({ species: 'fledermaus', mode: 'wander' }, w.cell(...w.homes.hoehle.bed))).toBeUndefined();
   });
 
-  it('das Paket trägt die Modelle der Höhlen-Tiere ein, die Fledermaus auch kopfüber', () => {
-    for (const id of Object.keys(CAVE_MODELS) as (keyof typeof CAVE_MODELS)[])
-      expect(SPECIES[id].parts, id).toBe(CAVE_MODELS[id]);
-    expect(SPECIES.fledermaus.roost).toBe(BAT_ROOST);
-    expect(HOEHLE_PACK.roosts).toEqual({ fledermaus: BAT_ROOST });
+  it('das Paket trägt die Modelle der Höhlen-Tiere ein (fein, die Grundform als Umriss), die Fledermaus auch kopfüber', () => {
+    for (const id of Object.keys(CAVE_MODELS) as (keyof typeof CAVE_MODELS)[]) {
+      expect(SPECIES[id].parts, id).toBe(CAVE_FINE_MODELS[id]);
+      expect(SPECIES[id].outline, id).toBe(CAVE_MODELS[id]);
+    }
+    expect(SPECIES.fledermaus.roost).toBe(CAVE_FINE_ROOST);
+    expect(HOEHLE_PACK.roosts).toEqual({ fledermaus: CAVE_FINE_ROOST });
   });
 });
 

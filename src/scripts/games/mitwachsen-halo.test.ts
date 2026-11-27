@@ -3,6 +3,7 @@ import { projection } from '../../lib/games/front';
 import { HALO_LIMIT } from '../../lib/games/shade';
 import type { Cell } from './mitwachsen-cell';
 import {
+  HALO_CAVE,
   HALO_HIDDEN,
   HaloPass,
   RISE_3D,
@@ -16,9 +17,9 @@ import {
   type HaloView,
 } from './mitwachsen-halo';
 
-type Spot = Pick<Cell, 'h' | 'ground' | 'deco' | 'light'>;
+type Spot = Pick<Cell, 'h' | 'ground' | 'deco' | 'light' | 'region'>;
 const SOUTH: HaloView = { rise: 1.1, to: [0, 1] };
-const flat: Spot = { h: 1, ground: 'grass', deco: null };
+const flat: Spot = { h: 1, ground: 'grass', deco: null, region: 'lichtung' };
 
 /** Bild mit ebenem Boden, alles erkundet; `cells` ändert einzelne Felder ("x,y") */
 function scene(cells: Record<string, Partial<Spot>> = {}, over: Partial<HaloScene> = {}): HaloScene {
@@ -46,6 +47,14 @@ describe('Leuchten: Auswahl', () => {
     const sc = scene({ '2,0': { light: 0.3 } }, { explored: (x) => x < 5 });
     const ids = pass.pick([halo('a', 0.5, 0.5), halo('b', 2.5, 0.5), halo('c', 6.5, 0.5)], sc).map((l) => l.h.id);
     expect(ids).toEqual(['a']);
+  });
+
+  it('in der Kristallgrotte leiser (`HALO_CAVE`): dort leuchtet fast alles, die Dunkelmaske bleibt dunkel', () => {
+    const lit = new HaloPass().pick([halo('a', 0.5, 0.5), halo('b', 2.5, 0.5)], scene({ '2,0': { region: 'hoehle' } }));
+    const alpha = Object.fromEntries(lit.map((l) => [l.h.id, l.alpha]));
+    expect(alpha.a).toBeCloseTo(haloAlpha(0));
+    expect(alpha.b).toBeCloseTo(haloAlpha(0) * HALO_CAVE);
+    expect(HALO_CAVE).toBeLessThan(1);
   });
 
   it('höchstens HALO_LIMIT zugleich, die nächsten zur Figur, und behält Gezeigte gegen knapp Nähere (Hysterese)', () => {

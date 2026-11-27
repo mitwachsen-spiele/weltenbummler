@@ -13,6 +13,7 @@ import {
   contactShadow,
   edgeShade,
   edgeStrip,
+  glowHalo,
   modelExtent,
 } from './mitwachsen-fine-2d';
 import type { Box } from './mitwachsen-view';
@@ -310,5 +311,18 @@ describe('Bild-Cache der feinen Dinge', () => {
     expect(sprites.size).toBe(2);
     expect(painted).toBe(4); // a, b, c, und b noch einmal (a blieb, weil es gebraucht wurde)
     expect(SPRITE_LIMIT).toBeGreaterThan(100);
+  });
+});
+
+describe('Leuchten scharfer Quader (`glowHalo`)', () => {
+  it('meldet das Leuchten eines Quaders der Art `glow` wie `box` mit Maler: nur mit `halo` und nur kompakt', () => {
+    const pen = new Fine2D();
+    glowHalo(pen, [1, 2, 3, 0.2, 0.4, 0.1, '#ff9cd4', '#ffffff', 'glow', { halo: true }]);
+    glowHalo(pen, [1, 2, 3, 0.2, 0.4, 0.1, '#ff9cd4', '#ffffff', 'glow']); // ohne `halo`
+    glowHalo(pen, [1, 2, 3, 0.2, 0.8, 0.1, '#ff9cd4', '#ffffff', 'glow', { halo: true }]); // zu lang
+    const [h, ...rest] = pen.take();
+    expect(rest).toEqual([]);
+    expect(h).toMatchObject({ x: 1.1, y: 2.2, z: 3.05, size: 0.4, color: '#ff9cd4' });
+    glowHalo({}, [1, 2, 3, 0.2, 0.4, 0.1, '#ff9cd4', '#ffffff', 'glow', { halo: true }]); // ein Maler ohne Leuchten
   });
 });

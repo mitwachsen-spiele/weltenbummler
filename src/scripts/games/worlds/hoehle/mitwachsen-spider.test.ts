@@ -9,6 +9,7 @@ import { CAVE_SPECIES } from '../../../../data/games/mitwachsen-hoehle';
 import { ICE_SPECIES } from '../../../../data/games/mitwachsen-eis';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
 import { SPIDER_MODELS, type SpiderPose } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { SPIDER_FINE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-fine';
 import { GROTTE, GROTTE_COLORS } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import type { Part } from '../../../../lib/games/front';
 import type { Cell } from '../../mitwachsen-cell';
@@ -170,7 +171,7 @@ describe('Tupfspinne: Gruß', () => {
   });
 
   it('ihre Teile behalten beim Skalieren Farben, Fläche und Feinheit', () => {
-    const models = SPIDER_MODELS;
+    const models = SPIDER_FINE_MODELS;
     const plain = models.rest;
     const fine = { skin: 'fell' as const };
     models.rest = plain.map((p): Part => [p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], fine]);

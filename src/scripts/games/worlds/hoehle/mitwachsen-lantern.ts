@@ -14,6 +14,7 @@ import type { Part } from '../../../../lib/games/front';
 import { GROTTE } from '../../../../data/games/worlds/hoehle/mitwachsen-grotte';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
 import type { Point } from '../../../../data/games/mitwachsen';
+import { dress } from '../../../../data/games/mitwachsen-fine';
 import type { Cell } from '../../mitwachsen-cell';
 import type { Ruled } from '../../mitwachsen-pack-types';
 import type { RideBody } from '../../mitwachsen-ride-view';
@@ -25,17 +26,25 @@ export const POST_H = 0.5;
 
 const CRYSTAL = ['#8fe0ea', '#d8f6fa'] as const;
 
-/** Die Laterne auf ihrem Sockel: Kristall im goldenen Rahmen (Boden, vier Streben, Deckel, Öse), größer als in der Hand */
-export const LANTERN_READY: Part[] = [
-  [-0.15, -0.15, 0, 0.3, 0.3, 0.05, GOLD.side, GOLD.top], // Boden
-  [-0.1, -0.1, 0.05, 0.2, 0.2, 0.28, ...CRYSTAL], // Kristall, leuchtet
-  [-0.15, -0.15, 0.05, 0.05, 0.05, 0.28, GOLD.side, GOLD.top], // vier Streben
-  [-0.15, 0.1, 0.05, 0.05, 0.05, 0.28, GOLD.side, GOLD.top],
-  [0.1, -0.15, 0.05, 0.05, 0.05, 0.28, GOLD.side, GOLD.top],
-  [0.1, 0.1, 0.05, 0.05, 0.05, 0.28, GOLD.side, GOLD.top],
-  [-0.16, -0.16, 0.33, 0.32, 0.32, 0.05, GOLD.side, GOLD.top], // Deckel
-  [-0.04, -0.04, 0.38, 0.08, 0.08, 0.06, GOLD.side, GOLD.top], // Öse
-];
+/**
+ * Die Laterne auf ihrem Sockel: Kristall im goldenen Rahmen (Boden, vier Streben, Deckel, Öse), größer als in der Hand.
+ * Fein wie in der Hand (mitwachsen-fine.ts `CARRY_DRESS`): der Rahmen Metall, der Kristall leuchtet weich (`halo`)
+ */
+export const LANTERN_READY: Part[] = dress(
+  [
+    [-0.15, -0.15, 0, 0.3, 0.3, 0.05, GOLD.side, GOLD.top], // Boden
+    [-0.1, -0.1, 0.05, 0.2, 0.2, 0.28, ...CRYSTAL], // Kristall, leuchtet
+    [-0.15, -0.15, 0.05, 0.05, 0.05, 0.28, GOLD.side, GOLD.top], // vier Streben
+    [-0.15, 0.1, 0.05, 0.05, 0.05, 0.28, GOLD.side, GOLD.top],
+    [0.1, -0.15, 0.05, 0.05, 0.05, 0.28, GOLD.side, GOLD.top],
+    [0.1, 0.1, 0.05, 0.05, 0.05, 0.28, GOLD.side, GOLD.top],
+    [-0.16, -0.16, 0.33, 0.32, 0.32, 0.05, GOLD.side, GOLD.top], // Deckel
+    [-0.04, -0.04, 0.38, 0.08, 0.08, 0.06, GOLD.side, GOLD.top], // Öse
+  ],
+  { [GOLD.side]: { skin: 'metall' }, [CRYSTAL[0]]: { halo: true } },
+);
+/** Halbbreite des weichen Flecks unter der Laterne: bleibt auf der Platte des Sockels */
+export const LANTERN_FOOT = 0.2;
 
 /** Platz des Sockels in einer Welt: neben dem Höhlenbett (`GROTTE.lantern`) */
 export const lanternSpot = (world: Pick<World, 'homes'>): Point => {
@@ -69,7 +78,9 @@ export function lanternBodies(state: { lamp?: unknown }, world: Pick<World, 'hom
   const [x, y] = lanternSpot(world);
   const c = world.cell(x, y);
   if (c.deco !== 'lantern') return [];
-  return [{ id: 'lantern', key: 'lantern-ready', x, y, z: c.h + POST_H, dir: 's', parts: LANTERN_READY }];
+  return [
+    { id: 'lantern', key: 'lantern-ready', x, y, z: c.h + POST_H, dir: 's', parts: LANTERN_READY, foot: LANTERN_FOOT },
+  ];
 }
 
 /** Ton beim Nehmen: drei helle Töne aufwärts, E5, G5, C6 (Pentatonik, Sinus, leise) */

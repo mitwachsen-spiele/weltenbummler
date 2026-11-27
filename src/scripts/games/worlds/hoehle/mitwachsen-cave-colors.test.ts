@@ -12,6 +12,7 @@ import { adornBoxes, caveBoxes, columnBoxes, lighten, patchOf } from './mitwachs
 import { fromMouth } from './mitwachsen-grotte';
 import { crystalOf, tipOf, veinOf } from './mitwachsen-fill';
 import { FLOOR, brightness, masked, rgbOf, type Rgb } from './mitwachsen-mask';
+import { faceShade, vertexShade } from '../../../../lib/games/shade';
 import { view } from './view-2d';
 import { view3d } from './view-3d';
 
@@ -87,9 +88,27 @@ describe('Farben der Grotte: Kontrast mit den echten Farben', () => {
     );
     expect(bad).toEqual([]);
     // Säulen leuchten in den Farben der Kristalle (beim Klingen noch heller)
-    const column = columnBoxes(cell('column', { note: 0 }), 3, 4)[1]!;
+    const column = columnBoxes(cell('column', { note: 0 }), 3, 4).find((b) => b[9]?.halo)!; // die Säule
     expect(C.crystals).toContain(column[6]);
     expect(brightness(rgbOf(lighten(C.crystals[0], 0.3)))).toBeGreaterThan(brightness(rgbOf(C.crystals[0])));
+  });
+
+  it('mit Verlauf (Feine Grafik): der Fuß wird zur Unterkante dunkler, also nur kontrastreicher; Leuchtendes wird halb so stark schattiert, im Mittel nicht dunkler als früher als flacher Block, und seine helle Oberseite hält 3 : 1', () => {
+    // 2D: die Seite schwarz überdeckt von oben nach unten (`faceShade`), 3D: Eckfarben (`vertexShade`)
+    const alpha = (c: string) => Number(/,([\d.]+)\)$/.exec(c)![1]);
+    const dim = (c: Rgb, a: number): Rgb => c.map((v) => v * (1 - a)) as unknown as Rgb;
+    const [, bottom] = faceShade(true).map(alpha) as [number, number];
+    for (const [name, f] of FLOORS) {
+      expect(contrast(dim(rgbOf(C.stal[0]), bottom), f), name).toBeGreaterThan(4); // Fuß an der Unterkante
+      expect(contrast(dim(rgbOf(C.stal[0]), 1 - vertexShade().sideBottom), f), name).toBeGreaterThan(4); // 3D
+    }
+    const lit = faceShade(true, true).map(alpha);
+    const FLAT = 0.18; // so dunkel war die Vorderseite eines flachen Blocks (`box` ohne Maler)
+    expect((lit[0]! + lit[1]!) / 2).toBeLessThanOrEqual(FLAT);
+    expect(1 - vertexShade(true).sideBottom).toBeLessThanOrEqual(FLAT);
+    // die Oberseite wird aufgehellt (weiß), nie abgedunkelt: Was als Farbe 3 : 1 hält, hält es oben auch
+    expect(faceShade(false, true).every((c) => c.startsWith('rgba(255,255,255,'))).toBe(true);
+    expect(Math.min(vertexShade(true).topFront, vertexShade(true).topBack)).toBeGreaterThanOrEqual(1);
   });
 
   it('Gold gegen den Boden: im Licht die Seite des Golds mindestens 2,4 : 1 auf jedem Boden, im Dunkel sein Licht mindestens 3 : 1', () => {

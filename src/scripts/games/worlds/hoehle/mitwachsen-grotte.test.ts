@@ -626,7 +626,7 @@ describe('Kristallgrotte: Gelände', () => {
       // die Bretter liegen quer zur Laufrichtung: Läuft der Steg in der Welt von West nach Ost, sind sie in y lang
       const runsEast = site.at(0, 1)[1] === site.at(0, 0)[1];
       expect(jetty.every(({ c }) => (c.note ?? 0) >= JETTY_EAST === runsEast)).toBe(true);
-      const boards = caveBoxes(w, jetty[0]!.c, 0, 0)!;
+      const boards = caveBoxes(w, jetty[0]!.c, 0, 0)!.filter((b) => b[9]?.skin === 'holz'); // ohne Nägel
       expect(boards.every(([, , , bw, bd]) => (runsEast ? bd > bw : bw > bd))).toBe(true);
       expect(ends.length).toBe(3);
       expect(ends.every(({ m }) => m[1] === Math.max(...jetty.map((j) => j.m[1])))).toBe(true);

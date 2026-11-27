@@ -92,7 +92,7 @@ import { hangAt, labelHeight } from './mitwachsen-roost';
 import { isRing } from './mitwachsen-rim';
 import { PAL_RING, rimBlossoms } from './mitwachsen-rim-look';
 import { workOf } from './mitwachsen-herald';
-import { Fine2D, Sprites, boxesExtent, contactShadow, edgeShade, modelExtent } from './mitwachsen-fine-2d';
+import { Fine2D, Sprites, boxesExtent, contactShadow, edgeShade, glowHalo, modelExtent } from './mitwachsen-fine-2d';
 import { HaloPass, type HaloLit, type HaloView } from './mitwachsen-halo';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
@@ -252,6 +252,7 @@ export class Renderer {
         if (Math.ceil(b[1] + b[4] - 1e-6) - 1 === y) {
           ctx.globalAlpha = b[8] === 'see' ? this.roof : 1; // Dach am Zuhause durchscheinend (`openRoof`)
           drawBox(ctx, P, b, b[8] === 'sway' || b[8] === 'glow' ? null : undefined); // Leuchtschrift, Lichtpunkte: scharf
+          if (b[8] === 'glow') glowHalo(this.fine, b); // scharf, leuchtet aber weich in den Raum wie in 3D
           ctx.globalAlpha = 1;
         }
       for (const r of rides.get(y) ?? []) this.ride(P, sc, r);

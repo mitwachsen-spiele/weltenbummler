@@ -13,7 +13,7 @@
 import type { Part } from '../../../../lib/games/front';
 import type { GateId, Point } from '../../../../data/games/mitwachsen';
 import { GOLD } from '../../../../data/games/mitwachsen-portals';
-import { CAVE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-models';
+import { CAVE_FINE_MODELS } from '../../../../data/games/worlds/hoehle/mitwachsen-cave-fine';
 import { dirTo } from '../../mitwachsen-free';
 import { HEAVE_END, type Heave } from '../../mitwachsen-guide';
 import type { RideAt, RideBody } from '../../mitwachsen-ride-view';
@@ -79,13 +79,19 @@ const hand = (r: number, u: number, k: number, c: readonly [string, string]): Pa
   flat(r - 0.06 * k, u + 0.06 * k, 0.06 * k, 0.1 * k, c, 0.04),
 ];
 const GOLD_C = [GOLD.side, GOLD.top] as const;
+/** Fein: der goldene Rahmen als Metall (Gold bleibt Gold, mit leisen Streifen) */
+const FRAME = { skin: 'metall' } as const;
+/** Rahmenteil der Tafel aus Metall */
+const framed = (p: Part): Part => [p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7] ?? null, p[8], FRAME];
 /** Die Tafel mit beiden Händen im goldenen Rahmen, zum Kind gewandt (Teile: vorn, rechts, oben, wie die Modelle) */
 export const HANDS: readonly Part[] = [
   flat(-0.42, 0.04, 0.84, 0.6, [BACK, BACK], -0.02),
-  flat(-0.48, 0, 0.96, 0.06, GOLD_C, 0.03), // Rahmen unten, oben, links, rechts
-  flat(-0.48, 0.62, 0.96, 0.06, GOLD_C, 0.03),
-  flat(-0.48, 0, 0.06, 0.68, GOLD_C, 0.03),
-  flat(0.42, 0, 0.06, 0.68, GOLD_C, 0.03),
+  ...[
+    flat(-0.48, 0, 0.96, 0.06, GOLD_C, 0.03), // Rahmen unten, oben, links, rechts
+    flat(-0.48, 0.62, 0.96, 0.06, GOLD_C, 0.03),
+    flat(-0.48, 0, 0.06, 0.68, GOLD_C, 0.03),
+    flat(0.42, 0, 0.06, 0.68, GOLD_C, 0.03),
+  ].map(framed),
   ...hand(-0.3, 0.1, 1, SKIN), // große Hand (Tok und die Figur schieben zusammen)
   ...hand(0.12, 0.12, 0.7, SKIN_SMALL), // kleine Hand
 ];
@@ -101,8 +107,8 @@ function rolled(t: number): number {
   return 1;
 }
 
-/** Ein Glühwürmchen: ein leuchtender Punkt */
-const FLY: readonly Part[] = [[-0.05, -0.05, 0, 0.1, 0.1, 0.1, '#d8ff6a', '#f0ffb0']];
+/** Ein Glühwürmchen: ein leuchtender Punkt, er leuchtet weich in den Raum (`halo`) */
+export const FLY: readonly Part[] = [[-0.05, -0.05, 0, 0.1, 0.1, 0.1, '#d8ff6a', '#f0ffb0', undefined, { halo: true }]];
 const FLIES = 6;
 const ease = (p: number) => p * p * (3 - 2 * p);
 
@@ -127,7 +133,8 @@ export function heaveBodies(s: Shown, world: Pick<World, 'gates' | 'cell'>, at: 
     const t = heaveAjar(s, at.reduced)?.[1] ?? 0;
     const k = rolled(t) * ROLLS; // wie weit der Stein schon rollte
     const [x, y] = [mx - ox * 0.55 + right[0] * k, my - oy * 0.55 + right[1] * k];
-    out.push({ id: 'heave:hands', key: 'heave-hands', x, y, z: z + 1.2, dir: dirTo(-ox, -oy), parts: HANDS });
+    // die Tafel hängt am Stein (kein Fleck am Boden)
+    out.push({ id: 'heave:hands', key: 'heave-hands', x, y, z: z + 1.2, dir: dirTo(-ox, -oy), parts: HANDS, foot: 0 });
     return out;
   }
   const dt = since({ ...s, heave: h }, at.frac) - BAT;
@@ -143,7 +150,7 @@ export function heaveBodies(s: Shown, world: Pick<World, 'gates' | 'cell'>, at: 
   const [bx, by] = bat(p);
   const [nx, ny] = bat(Math.min(1, p + 0.02));
   const lift = z + 2.2 + 0.4 * Math.sin(p * Math.PI * 4);
-  const fledermaus = CAVE_MODELS.fledermaus;
+  const fledermaus = CAVE_FINE_MODELS.fledermaus;
   out.push({
     id: 'heave:bat',
     key: 'heave-bat',
@@ -152,6 +159,7 @@ export function heaveBodies(s: Shown, world: Pick<World, 'gates' | 'cell'>, at: 
     z: lift,
     dir: dirTo(nx - bx, ny - by),
     parts: fledermaus,
+    foot: 0, // fliegt hoch über der Bucht
   });
   // Glühwürmchen: aus der Bucht hinein in den Gang, eins nach dem anderen
   const to: Point = [mx + ox * 2, my + oy * 2];
@@ -162,7 +170,7 @@ export function heaveBodies(s: Shown, world: Pick<World, 'gates' | 'cell'>, at: 
     const from: Point = [mx - ox * back + right[0] * (i - 2.5) * 0.8, my - oy * back + right[1] * (i - 2.5) * 0.8];
     const [fx, fy] = [from[0] + (to[0] - from[0]) * q, from[1] + (to[1] - from[1]) * q];
     const fz = z + 0.6 + 0.3 * Math.sin(p * 9 + i);
-    out.push({ id: `heave:fly:${i}`, key: 'heave-fly', x: fx, y: fy, z: fz, dir: 's', parts: FLY });
+    out.push({ id: `heave:fly:${i}`, key: 'heave-fly', x: fx, y: fy, z: fz, dir: 's', parts: FLY, foot: 0 });
   }
   return out;
 }
