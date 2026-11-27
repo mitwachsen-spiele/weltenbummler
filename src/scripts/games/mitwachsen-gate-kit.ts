@@ -6,6 +6,8 @@
 // Die Torreihe liegt bei z −0,5 … 0,5, davor (z > 0,5) beginnt die Bucht, dahinter (z < −0,5) Fels und Gang.
 
 import { Geo, col, type V3 } from './mitwachsen-geo';
+import { spread, type GateBox } from './mitwachsen-gate-flora';
+import { TINY } from './mitwachsen-fine-chunk-3d';
 import type { PlateLook } from './mitwachsen-plate';
 
 /** Teile, die mit verschiedenen Materialien gezeichnet werden */
@@ -14,9 +16,31 @@ export type Parts = {
   lava: Geo; // glühende Lava
   bright: Geo; // leuchtet aus sich selbst: Kristalle, Zeichen, Wasserfall
   leaves: Geo; // Laub
+  plant: Geo; // Pflanzen als feine Modelle (mitwachsen-gate-flora.ts): Muster, Verlauf, vor der Figur durchsichtig
+  plantTiny: Geo; // ihre winzigen Teile (Rillen, Tupfen): wie `plant`, aber ohne Schattenwurf
 };
 export type Part = keyof Parts;
-export const parts = (): Parts => ({ solid: new Geo(), lava: new Geo(), bright: new Geo(), leaves: new Geo() });
+export const parts = (): Parts => ({
+  solid: new Geo(),
+  lava: new Geo(),
+  bright: new Geo(),
+  leaves: new Geo(),
+  plant: new Geo(),
+  plantTiny: new Geo(),
+});
+
+/**
+ * Feine Quader einer Pflanze (mitwachsen-gate-flora.ts) in die Teile: in `plant`, winzige (dünner als `TINY`) in
+ * `plantTiny` (werfen keinen Schatten), leuchtende (`glow`, Glutkrone) in `bright`; jeder um seinen eigenen kleinen
+ * Betrag größer (`spread`), damit keine zwei Flächen in einer Ebene liegen
+ */
+export function plantInto(p: Parts, boxes: readonly GateBox[], glow = false) {
+  spread(boxes).forEach(([x, y, z, w, h, d, side, top, fine], n) => {
+    const [, , , w0, h0, d0] = boxes[n]!;
+    const g = glow ? p.bright : Math.min(w0, h0, d0) < TINY ? p.plantTiny : p.plant;
+    g.box(x, y, z, w, h, d, side, top, 'white', undefined, fine);
+  });
+}
 
 /** Ein Türflügel: eigene Teile, die um ihre Angel (x, z) um `angle` gedreht stehen (um die senkrechte Achse, Bogenmaß) */
 export type Wing = { parts: Parts; hinge: readonly [number, number]; angle: number };

@@ -6,10 +6,12 @@
 // in zwei Stufen: so hoch und bunt steht kein Baum auf der Lichtung. Daneben dunkle Tannen auf dem Fels.
 // Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js).
 //
-// Stamm und Krone sind Quader mit Rinden- und Laubtextur wie die Bäume der Lichtung (als Voxel wären es Zehntausende);
-// alles Feine (Tür, Bogenrand, Moos, Spechtloch, Specht, Schild) liegt in einem Voxel-Raster davor.
+// Der Stamm (das Torhaus) ist aus Quadern mit Rindentextur (als Voxel wären es Zehntausende); Krone und Tannen sind
+// feine Modelle wie die Bäume der Lichtung (Blatt- und Nadelmuster, mitwachsen-gate-flora.ts); alles Kleine (Tür,
+// Bogenrand, Moos, Spechtloch, Specht, Schild) liegt in einem Voxel-Raster davor.
 
-import { Vox, ease, hash3, seg, type GateBuild, type GateCtx, type Parts } from './mitwachsen-gate-kit';
+import { Vox, ease, hash3, plantInto, seg, type GateBuild, type GateCtx, type Parts } from './mitwachsen-gate-kit';
+import { firBoxes, leafBox } from './mitwachsen-gate-flora';
 import type { PlateLook } from './mitwachsen-plate';
 
 const F = {
@@ -39,7 +41,6 @@ const LAUB = {
   dunkel: ['#2f7a34', '#3f9a3c'],
   herbst: ['#d9732e', '#f39a4e'],
   rot: ['#b8452a', '#d2603a'],
-  tanne: ['#24563a', '#2f6a45'],
 } as const;
 type Laub = keyof typeof LAUB;
 
@@ -110,11 +111,11 @@ class Boxes {
         }
   }
 
-  /** Laub (Quader von Ecke zu Gegenecke) */
+  /** Laub (Quader von Ecke zu Gegenecke), fein mit Blatt-Muster wie die Kronen der Lichtung */
   leaf(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, look: Laub) {
     const e = ++this.n * 0.0011;
     const [side, top] = LAUB[look];
-    this.p.leaves.box(x0 - e, y0 + e, z0 - e, x1 - x0 + 2 * e, y1 - y0, z1 - z0 + 2 * e, side, top, 'leaves');
+    plantInto(this.p, [leafBox(x0 - e, y0 + e, z0 - e, x1 + e, y1, z1 + e, side, top)]);
   }
 
   /** Laubballen: unten und oben schmaler, in der Mitte über Kreuz (achteckig) */
@@ -127,16 +128,9 @@ class Boxes {
     at(0.6, 0.6, 0.7, 1);
   }
 
-  /** Dunkle Tanne in Stufen */
+  /** Dunkle Tanne in Stufen auf schmalem Stamm (feines Modell, mitwachsen-gate-flora.ts) */
   tanne(x: number, z: number, s: number) {
-    this.p.solid.box(x - 0.15 * s, 0, z - 0.15 * s, 0.3 * s, 0.7 * s, 0.3 * s, F.rinde, F.rinde, 'log', 'logTop');
-    const tiers = [
-      [0.8, 0.45, 1.25],
-      [0.6, 1.1, 1.85],
-      [0.4, 1.7, 2.4],
-      [0.18, 2.3, 2.8],
-    ] as const;
-    for (const [w, a, b] of tiers) this.leaf(x - w * s, a * s, z - w * s, x + w * s, b * s, z + w * s, 'tanne');
+    plantInto(this.p, firBoxes(x, z, s));
   }
 }
 

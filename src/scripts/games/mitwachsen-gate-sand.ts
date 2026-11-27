@@ -2,10 +2,11 @@
 // Sandstein. Zu füllt eine Düne den Durchgang, aus dem Bogen rieseln Sandfäden wie in der Sanduhr. Beim Öffnen reißen
 // die Fäden ab, die Düne rinnt von der Mitte her in den Boden, darunter liegen helle Platten, und die trockene Mulde im
 // linken Pfeiler füllt sich mit Wasser. Offen hängen Tonglöckchen unter dem Bogen. Zwei hohe Palmen der Oase ragen
-// hinter den Pfeilern über den Fels, oben auf dem Bogen sitzt die Sonnenscheibe mit Pyramide und schaut zur Kamera.
+// hinter den Pfeilern über den Fels (feine Modelle: mitwachsen-gate-flora.ts), oben auf dem Bogen sitzt die Sonnenscheibe mit Pyramide und schaut zur Kamera.
 // Gehört zur 3D-Ansicht und wird nur mit ihr nachgeladen (Three.js).
 
-import { Vox, ease, hash3, seg, type GateBuild, type GateCtx } from './mitwachsen-gate-kit';
+import { Vox, ease, hash3, plantInto, seg, type GateBuild, type GateCtx } from './mitwachsen-gate-kit';
+import { palmBoxes, type Palm } from './mitwachsen-gate-flora';
 import type { PlateLook } from './mitwachsen-plate';
 
 const SST = ['#b9965c', '#d1b273', '#e2c78e'] as const; // Sandstein dunkel, mittel, hell
@@ -16,7 +17,6 @@ const PLATE = { top: SST[2], side: SST[1] };
 const MULDE = { dry: '#b48d58', crack: '#8f6a3e' };
 const WATER = { c: '#7fc8ff', glint: '#b8e2ff' };
 const TON = { c: '#c96f4a', top: '#d98a62', dark: '#8a4a2a', cord: '#a0764a' };
-const PALM = { bark: ['#8a6238', '#a0764a'], leaf: '#4e9a52', leafDark: '#3f7f44' } as const;
 
 // Maße in Voxeln (1/8 Feld): Pfeiler |i| 20 … 32 (x 2,5 … 4), Tiefe k −6 … 4 (z −0,75 … 0,5), Brücke ab j 32 (y 4)
 const P_IN = 20,
@@ -181,43 +181,11 @@ function bells(v: Vox) {
   }
 }
 
-type Palm = { x: number; z: number; h: number; lean: number; turn: number };
-type Put = (i: number, j: number, k: number, c: string, part?: 'solid' | 'leaves') => void;
-
-/** Palme aus Voxeln: Stamm geringelt und nach außen geneigt, sechs hängende Wedel; setzt nichts in Belegtes */
-function palm(v: Vox, o: Palm) {
-  const put: Put = (i, j, k, c, part = 'solid') => {
-    if (!v.has(i, j, k)) v.set(i, j, k, c, part);
-  };
-  const K = Math.round(o.h * 8);
-  const tk = Math.round(o.z * 8);
-  let ti = 0;
-  for (let j = 0; j < K; j++) {
-    ti = Math.round((o.x + o.lean * (j / K) ** 2) * 8);
-    const c = PALM.bark[Math.floor(j / 2) % 2]!;
-    for (let a = -1; a < 1; a++) for (let b = -1; b < 1; b++) put(ti + a, j, tk + b, c);
-  }
-  for (let a = -1; a < 1; a++) for (let b = -1; b < 1; b++) put(ti + a, K, tk + b, PALM.leafDark, 'leaves');
-  for (let d = 0; d < 6; d++) frond(put, ti, K, tk, (d / 6) * Math.PI * 2 + o.turn);
-}
-
-/** Ein Palmwedel: steigt erst, hängt dann durch, mit Fiedern zur Seite */
-function frond(put: Put, ti: number, top: number, tk: number, ang: number) {
-  const [dx, dz, L] = [Math.cos(ang), Math.sin(ang) * 0.85, 12];
-  let prev: number | null = null;
-  for (let s = 0; s <= L; s++) {
-    const i = Math.round(ti + dx * s),
-      k = Math.round(tk + dz * s);
-    const j = Math.round(top + 1 + s * 0.7 - s * s * 0.11);
-    const c = s % 3 === 2 ? PALM.leafDark : PALM.leaf;
-    for (let jj = j; jj <= (prev === null ? j : Math.max(j, prev - 1)); jj++) put(i, jj, k, c, 'leaves');
-    if (s > 1 && s < L - 1 && s % 2 === 0) {
-      put(i - Math.round(dz), j - 1, k + Math.round(dx), PALM.leafDark, 'leaves');
-      put(i + Math.round(dz), j - 1, k - Math.round(dx), PALM.leaf, 'leaves');
-    }
-    prev = j;
-  }
-}
+/** Zwei hohe Palmen der Oase hinter den Pfeilern, nach außen geneigt (feine Modelle, mitwachsen-gate-flora.ts) */
+export const PALMS: readonly Palm[] = [
+  { x: -4.6, z: -1.1, h: 6.9, lean: -0.4, turn: 0.2 },
+  { x: 4.6, z: -1.3, h: 7.5, lean: 0.4, turn: 0.6 },
+];
 
 /** Weltzeichen der Sandwelt wie auf der Portal-Plattform: Sonne über Pyramide in runder Scheibe */
 const SIGN = [
@@ -252,8 +220,6 @@ export function sandGate(g: GateCtx): Vox {
   dune(v, u, g.open >= 0.5 ? 1 : 0);
   if (g.open < 0.2) threads(v, seg(g.open, 0, 0.2));
   if (g.open >= 0.9) bells(v);
-  palm(v, { x: -4.6, z: -1.1, h: 6.9, lean: -0.4, turn: 0.2 });
-  palm(v, { x: 4.6, z: -1.3, h: 7.5, lean: 0.4, turn: 0.6 });
   // Schild auf der Brücke, Unterkante auf ihrer Oberseite; schaut immer zur Kamera
   v.image(0, TOP / 8, -0.625, SIGN, SIGN_PAL, g.cam, 'bright', 1);
   return v;
@@ -261,6 +227,7 @@ export function sandGate(g: GateCtx): Vox {
 
 export const build: GateBuild = (p, g) => {
   sandGate(g).emit(p);
+  for (const palm of PALMS) plantInto(p, palmBoxes(palm));
   return [];
 };
 

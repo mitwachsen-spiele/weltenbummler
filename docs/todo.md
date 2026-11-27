@@ -114,4 +114,5 @@
   - [ ] Am Gerät ansehen: Folgt er einem Pfad, erkennt er die Materialien?
 - [x] Weltrand: eigene Antwort beim Dagegenlaufen (Issue 41, 26.11.2026): Ereignis `edge` statt `bump` an Hecke, Eisklippe und Grottenwand (`mitwachsen-edge.ts`), weicher tiefer Ton, Vogel in der Hecke, Glitzer am Eis, Echo in der Grotte, höchstens alle 1,5 s
   - [ ] Am Gerät ansehen: Versteht er den Rand jetzt, stört der Ton?
+- [ ] Feine Grafik (Issue 13): Otter und Boot aus dem Entwurf „Feine Grafik“ gibt es im Spiel noch nicht; sie kommen mit der Wasserwelt (Punkt unten) gleich fein (Fell mit Strich, Schnurrhaare, heller Bauch; Boot in Lack/Holz)
 - [ ] Als Nächstes: Wasserwelt mit dem Boot (plant ihre Rundfahrt von Anfang an mit) (Konzept „Reisewege“ und „Gleisbauer und Höhlen-Welt“, Folgen für wasserwelt.html): Das Boot ruht, bis die Höhlen-Leiste voll ist und der Zug das Kind danach einmal heimgebracht hat; dann kommt der Otter als Bote ans Lichtungsbett; Hafenbecken und Kanal, dieselben Fahrregeln (Fahr-Engine `worlds/fahrt/`)

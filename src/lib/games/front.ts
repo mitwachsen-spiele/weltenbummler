@@ -124,8 +124,18 @@ export type FaceRect = {
   readonly side: boolean;
 };
 
-/** Leuchten eines kompakten Teils: Mitte in der Welt (x rechts, y nach vorn, z Höhe), größte Kante in Feldern, Farbe */
-export type HaloAt = { readonly x: number; readonly y: number; readonly z: number; size: number; color: string };
+/**
+ * Leuchten eines kompakten Teils: Mitte in der Welt (x rechts, y nach vorn, z Höhe), größte Kante in Feldern, Farbe;
+ * `id` feste Kennung für Teile, die sich bewegen (sonst kennt die Ansicht es an seiner Lage)
+ */
+export type HaloAt = {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  size: number;
+  color: string;
+  readonly id?: string;
+};
 
 /**
  * Maler der feinen Dinge, hereingereicht von der Ansicht (die Muster liegen dort, `lib` kennt keinen Browser-Code):

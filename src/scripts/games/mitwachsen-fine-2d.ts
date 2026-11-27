@@ -86,8 +86,8 @@ function shade(ctx: CanvasRenderingContext2D, side: boolean, halo: boolean): Can
   return g;
 }
 
-/** Kennung eines Leuchtens aus seiner Lage (gleich in jedem Bild, solange es nicht wandert) */
-const haloId = (h: HaloAt) => `${h.x.toFixed(2)},${h.y.toFixed(2)},${h.z.toFixed(2)}`;
+/** Kennung eines Leuchtens: die mitgegebene, sonst aus seiner Lage (gleich in jedem Bild, solange es nicht wandert) */
+const haloId = (h: HaloAt) => h.id ?? `${h.x.toFixed(2)},${h.y.toFixed(2)},${h.z.toFixed(2)}`;
 
 /** Muster (wenn `skins`) und Verlauf über eine schon gefüllte Fläche */
 function overlay(ctx: CanvasRenderingContext2D, f: FaceRect, fine: Fine | undefined, skins: boolean) {

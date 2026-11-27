@@ -66,7 +66,8 @@ import {
   sleeperBoxes,
 } from './mitwachsen-yard-look';
 import { clampRow, rowCache, sortBoxes } from './mitwachsen-row';
-import { drawStone, heardStone } from './mitwachsen-story';
+import { heardStone, noteFloat } from './mitwachsen-story';
+import { STONE_FOOT, drawStone } from './mitwachsen-stone-look';
 import type { WeatherLook } from './mitwachsen-weather';
 import type { Pose } from './mitwachsen-tired';
 import type { Climate } from './mitwachsen-world';
@@ -493,7 +494,7 @@ export class Renderer {
   /** Wegstein und Torplatte auf dem Feld (nach dem Boden, vor dem Nebelrand: Sinkt sie ein, verdeckt das Feld davor ihre Vorderkante) */
   private plate(P: Projection, world: World, c: Cell, x: number, y: number, sc: Scene) {
     const way = stoneOf(c); // Wegstein neben einem Weltpfad: wach, sobald sein Tor offen ist
-    if (way) for (const b of waystoneBoxes(x, y, c.h, way, sc.gates.has(way))) box(this.ctx, P, ...b);
+    if (way) for (const b of waystoneBoxes(x, y, c.h, way, sc.gates.has(way))) drawBox(this.ctx, P, b);
     if (c.plate) {
       const look = this.views.get(c.plate)?.plate; // Schmuck aus dem Paket der Welt dahinter (Eis-Welt: Scholle)
       // goldener Rand, solange der Pinguin zu diesem Tor führt (aus dem Paket)
@@ -723,14 +724,15 @@ export class Renderer {
     switch (c.deco) {
       case 'biggate': // Torhaus: Tür (je nach Öffnung), Türme, Torbogen; führt der Pinguin hierher, sein Umriss
       case 'gatetower':
-        this.flat(() => bigGate(ctx, P, world, c, x, y, h, sc.gates, this.guest));
+        this.flat(() => bigGate(ctx, P, world, c, x, y, h, sc.gates, this.guest, this.fine)); // Tür und Beschläge fein
         break;
       case 'portal':
       case 'portalrim':
         this.flat(() => drawPlatform(ctx, P, world, state, x, y, h, c.portal!));
         break;
       case 'klangstein':
-        this.flat(() => drawStone(ctx, P, x, y, h, heardStone(state, c.story!), sc.now, sc.reduced)); // wie in 3D noch Block
+        contactShadow(ctx, P, x + 0.5, y + 0.5, h, STONE_FOOT); // weicher Fleck wie unter dem Findling
+        drawStone(ctx, P, x, y, h, noteFloat(sc.now, x + y, heardStone(state, c.story!), sc.reduced)); // fein, Note leuchtet
         break;
       case 'gate':
         for (const b of clampRow(fenceBoxes(world, x, y, h, 1 - (sc.gates.get(c.gate!) ?? 0)), y)) drawBox(ctx, P, b);

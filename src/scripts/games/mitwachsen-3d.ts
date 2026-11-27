@@ -60,7 +60,8 @@ import { Platforms3D } from './mitwachsen-platform-3d';
 import { frontShot } from './mitwachsen-card-3d';
 import { fogMask, fogSeen } from './mitwachsen-fog-3d';
 import { riseOf, type HaloView } from './mitwachsen-halo';
-import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
+import { StoneNotes } from './mitwachsen-story-3d';
+import { stoneBoxes } from './mitwachsen-stone-look';
 import type { LoadedPack } from './mitwachsen-packs';
 import type { Scene } from './mitwachsen-render';
 import { footOf, SHEER } from './mitwachsen-ride-view';
@@ -248,7 +249,8 @@ export class World3D {
     this.withFog(this.bright, { fine: true }); // Kristalle sind fein, Zeichen und Wasserfälle der Tore nicht
     this.withFog(this.fineSolid, { fine: true });
     this.withFog(this.fineCanopy, { see: true, fine: true });
-    for (const m of [this.entity, this.sheer]) composeShader(m, this.fogUniforms, this.skins, { fine: true });
+    for (const m of [this.entity, this.sheer, this.notes.material])
+      composeShader(m, this.fogUniforms, this.skins, { fine: true });
     this.platforms = new Platforms3D(this.gateSolid, this.bright, () => {
       const m = new MeshBasicMaterial({ map: tex, vertexColors: true });
       this.withFog(m, {});
@@ -336,7 +338,7 @@ export class World3D {
 
   /** Leuchten kompakter Teile in diesem Bild (Stücke um die Figur, Modelle), für den Durchgang auf der Ebene darüber */
   halos(): (HaloAt & { id: string })[] {
-    return [...[...this.chunks.values()].flatMap((c) => c.halos), ...this.bodyHalos];
+    return [...[...this.chunks.values()].flatMap((c) => c.halos), ...this.bodyHalos, ...this.notes.halos];
   }
 
   /** Blick der Kamera und Nebelrand für das Leuchten auf der Ebene darüber (mitwachsen-halo.ts) */
@@ -542,10 +544,12 @@ export class World3D {
       [p.lava, this.lava],
       [p.bright, this.bright],
       [p.leaves, this.canopy],
+      [p.plant, this.fineCanopy], // Pflanzen im Torhaus fein (Palmen, Glutbaum, Tannen, Riesenpilze)
+      [p.plantTiny, this.fineCanopy], // … ihre winzigen Teile, ohne Schattenwurf
     ] as const) {
       if (g.empty) continue;
       const m = new Mesh(g.build(), mat);
-      m.castShadow = mat !== this.bright;
+      m.castShadow = mat !== this.bright && g !== p.plantTiny;
       m.receiveShadow = true;
       out.push(m);
     }
@@ -620,7 +624,7 @@ export class World3D {
         const rails = c.ride ? this.views.rails(c, x, y, this.at) : null;
         if (rails) fineBoxes(fine, rails);
         if (!rails && !this.packed({ fine, blades: leaves, glow }, c, x, y))
-          this.decoration(solid, leaves, bright, fine, c, x, y);
+          this.decoration(leaves, bright, fine, c, x, y);
       }
     const meshes: Mesh[] = [];
     const add = (g: Geo, mat: MeshLambertMaterial | MeshBasicMaterial, shadows: boolean) => {
@@ -712,9 +716,9 @@ export class World3D {
     if (c.rim) for (const [bx, by, bz, w, d, bh, color] of rimBlossoms(x, y, h)) g.box(bx, bz, by, w, bh, d, color);
     const way = stoneOf(c); // Wegstein neben einem Weltpfad: wach, sobald sein Tor offen ist
     if (way)
-      for (const [bx, by, bz, w, d, bh, side, top] of waystoneBoxes(x, y, h, way, this.opened.includes(way)))
-        if (fine) fineBox(fine.solid, [bx, by, bz, w, d, bh, side, top]);
-        else g.box(bx, bz, by, w, bh, d, side, top);
+      for (const b of waystoneBoxes(x, y, h, way, this.opened.includes(way)))
+        if (fine) fineBox(sinkOf(fine, b), b);
+        else g.box(b[0], b[2], b[1], b[3], b[5], b[4], b[6], b[7]);
   }
 
   /**
@@ -737,14 +741,14 @@ export class World3D {
 
   /**
    * Dinge auf einem Feld aus derselben Quelle wie 2D (mitwachsen-deco-look.ts): Laub (`see`) vor der Figur durchsichtig,
-   * Kristalle leuchten aus sich selbst; Bett, Tafel und Klangstein baut die 3D-Ansicht selbst
+   * Kristalle leuchten aus sich selbst; Bett, Tafel und Klangstein (mitwachsen-stone-look.ts) aus ihren eigenen Quadern
    */
-  private decoration(g: Geo, blades: Geo, bright: Geo, fine: FineSinks, c: Cell, x: number, y: number) {
+  private decoration(blades: Geo, bright: Geo, fine: FineSinks, c: Cell, x: number, y: number) {
     const h = c.h;
     if (c.tufts) tufts(blades, x, y, h, c.tufts);
     switch (c.deco) {
       case 'klangstein':
-        return stoneInto(g, x, y, h);
+        return fineBoxes(fine, stoneBoxes(x, y, h));
       case 'bed':
         return fineBoxes(fine, bedBoxes(x, y, h, this.views.bedFrame(c, WOOD_BED)));
       case 'sign': {

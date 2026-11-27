@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BEATS, VOX, parts, type Vox } from './mitwachsen-gate-kit';
-import { SIGN_AT, build, motion, motionVox, pilzVox, plate } from './mitwachsen-gate-pilze';
+import { SIGN_AT, build, giantOf, motion, motionVox, pilzVox, plate } from './mitwachsen-gate-pilze';
+import { giantBoxes, type GateBox } from './mitwachsen-gate-flora';
 import { checkPlate } from './test-plates';
 import { GLOW } from '../../data/games/mitwachsen-portals';
 
@@ -145,4 +146,47 @@ describe('Torplatte vor dem Zugang (pilze)', () => {
     expect([plate.under, plate.deep, plate.bob]).toEqual(['F', true, undefined]);
     expect(GLOW.has('F')).toBe(true);
   });
+});
+
+/** Voxel aus `all`, die von `seeds` aus über Nachbarn (auch über Kanten und Ecken) nicht zu erreichen sind */
+function unreached(all: readonly (readonly number[])[], seeds: readonly (readonly number[])[]): string[] {
+  const key = (c: readonly number[]) => c.join();
+  const left = new Map(all.map((c) => [key(c), c]));
+  const queue = [...seeds];
+  for (const c of seeds) left.delete(key(c));
+  const near = [-1, 0, 1].flatMap((a) => [-1, 0, 1].flatMap((b) => [-1, 0, 1].map((c) => [a, b, c] as const)));
+  while (queue.length) {
+    const [i = 0, j = 0, k = 0] = queue.pop()!;
+    for (const [a, b, c] of near) {
+      const n = left.get(key([i + a, j + b, k + c]));
+      if (n && left.delete(key(n))) queue.push(n);
+    }
+  }
+  return [...left.keys()];
+}
+
+describe('Ranken an den feinen Riesenpilzen', () => {
+  /** Voxel (i, j, k) berührt den Quader oder greift in ihn hinein */
+  const touches = ([i, j, k]: readonly number[], [x, y, z, w, h, d]: GateBox) =>
+    [
+      [i!, x, w],
+      [j!, y, h],
+      [k!, z, d],
+    ].every(([n, lo, size]) => n! / VOX <= lo! + size! + 0.005 && (n! + 1) / VOX >= lo! - 0.005);
+  for (const open of [0, 0.5, 1])
+    it(`die Ranke um den Stiel hängt am Stiel: kein Voxel schwebt (offen ${open})`, () => {
+      const v = pilzVox({ open, cam: [0, 1], all: true });
+      for (const side of [-1, 1]) {
+        const giant = giantOf(side, open);
+        const stem = giantBoxes(giant).filter((b) => b[8].skin === 'haar');
+        // das Band um den Stiel: über dem Sockel, unter dem Hut, nah an der Achse
+        const band = cells(v).filter(
+          ([i, j, k]) => j >= 9 && j <= 22 && Math.hypot((i + 0.5) / VOX - giant.x, (k + 0.5) / VOX - giant.z) < 1.5,
+        );
+        expect(band.length).toBeGreaterThan(50);
+        const seeds = band.filter((c) => stem.some((b) => touches(c, b)));
+        const left = unreached(band, seeds);
+        expect(left, `Seite ${side}`).toEqual([]);
+      }
+    });
 });

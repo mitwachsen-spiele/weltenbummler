@@ -19,7 +19,8 @@ import { Sfx } from './sfx';
 import { nightIn, tunnelNight } from './mitwachsen-dusk';
 import { plateToy } from './mitwachsen-plate-toy';
 import { postcard } from './mitwachsen-plate';
-import { NOTE_COLORS, StoryPlayer } from './mitwachsen-story';
+import { StoryPlayer } from './mitwachsen-story';
+import { NOTE_COLORS } from './mitwachsen-stone-look';
 import { FriendLook, SIGHT_SPARKS, sightScore } from './mitwachsen-sight-look';
 import { marksOf, sightsOf } from './mitwachsen-sight';
 import {
