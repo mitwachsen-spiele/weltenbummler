@@ -2,11 +2,7 @@
 
 ## Vor dem Livegang
 
-- [ ] DNS: `www` als CNAME auf `larmic.github.io`, die Domain ohne `www` mit A/AAAA-Einträgen auf GitHub Pages (Werte im README unter „Einmalig einrichten“)
-- [ ] Domain im GitHub-Profil verifizieren (TXT-Eintrag)
-- [ ] GitHub Pages: Quelle „GitHub Actions“, Custom domain `www.mitwachsen-spiele.de`, „Enforce HTTPS“
-- [ ] Branch-Schutz für `main`: Pflicht-Check „Guard-Gates und Build“ (sonst übernimmt Renovate Updates ohne Prüfung)
-- [ ] Renovate-App für das Repo freischalten
+- [ ] Umzug in die Organisation `mitwachsen-spiele` abschließen (DNS, Verifizierung, Pages, Ruleset, Renovate): larmic/mitwachsen-spiele#71
 - [ ] Datenschutzerklärung prüfen lassen
 - [ ] Seite in der Search Console anmelden
 - [x] Texte der Startseite schreiben (`src/data/landing.ts`, erste Fassung 17.11.2026, gegenlesen)

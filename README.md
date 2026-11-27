@@ -100,14 +100,14 @@ Lokal laufen alle zusammen mit `npm run gates`. Zusätzlich prüft ein Git-Hook 
 
 Die Pipeline `.github/workflows/deploy.yml` läuft bei jedem Pull Request (auch von Renovate) und bei jedem Push auf `main`. Ihre Jobs:
 
-1. **Guard-Gates** – nur mit Leserechten und parallel: `static` (Formatierung, Lint, Architektur, Typen, Unit-Tests), `coverage` (Unit-Tests mit Mindest-Abdeckung), `build` (baut die Seite und prüft das Ergebnis mit `npm run verify`), danach die Browser-Tests auf genau diesem Build: `e2e-site` (Seiten ohne Spiel) und `e2e-game` (das Spiel, in zwei Teilen). `e2e-merge` führt deren Berichte zu einem zusammen (Artefakt `playwright-report`).
-2. **Deploy auf GitHub Pages** – nur auf `main`, erst wenn alle Guard-Gates grün sind: veröffentlicht die fertige Seite mit `actions/deploy-pages`. Er braucht nur die Rechte `pages: write` und `id-token: write` und zum Lesen `contents: read` (ist `main` schon weiter, veröffentlicht der neuere Lauf), keine Schreibrechte aufs Repo, und installiert und baut nichts.
+1. **Guard-Gates** – nur mit Leserechten und parallel: `static` (Formatierung, Lint, Architektur, Typen, Unit-Tests), `coverage` (Unit-Tests mit Mindest-Abdeckung), `build` (baut die Seite und prüft das Ergebnis mit `npm run verify`), danach die Browser-Tests auf genau diesem Build: `e2e-site` (Seiten ohne Spiel) und `e2e-game` (das Spiel, in zwei Teilen). `e2e-merge` führt deren Berichte zu einem zusammen (Artefakt `playwright-report`). Der Job `Guard-Gates` fasst alle Gates zu einem Ergebnis zusammen; er ist der einzige Pflicht-Check im Ruleset `protect main`.
+2. **Deploy auf GitHub Pages** – nur auf `main`, erst wenn der Job `Guard-Gates` grün ist: veröffentlicht die fertige Seite mit `actions/deploy-pages`. Er braucht nur die Rechte `pages: write` und `id-token: write` und zum Lesen `contents: read` (ist `main` schon weiter, veröffentlicht der neuere Lauf), keine Schreibrechte aufs Repo, und installiert und baut nichts.
 
 So laufen die Install-Skripte neuer Paketversionen nie mit einem Schreib-Token.
 
 Für den Notfall gibt es `.github/workflows/fast-deploy.yml` (Schnell-Deploy): Er startet nur von Hand über die GitHub-Oberfläche (Actions → „Schnell-Deploy ohne Guard-Gates“ → Run workflow, Branch `main`), baut `main` und veröffentlicht sofort, ohne Guard-Gates und ohne Browser-Tests. Die Rechte sind dieselben wie oben; auch hier laufen die Install-Skripte ohne Schreib-Token.
 
-In den GitHub-Pages-Einstellungen ist die Quelle „GitHub Actions“. Die Domain `www.mitwachsen-spiele.de` steht dort ebenfalls (Custom domain), eine `CNAME`-Datei braucht es dafür nicht, und Jekyll läuft bei diesem Weg nicht, also auch kein `.nojekyll`. Alle Actions sind auf Commit-SHAs gepinnt.
+In den GitHub-Pages-Einstellungen ist die Quelle „GitHub Actions“. Die Domain `weltenbummler.mitwachsen-spiele.de` steht dort ebenfalls (Custom domain), eine `CNAME`-Datei braucht es dafür nicht, und Jekyll läuft bei diesem Weg nicht, also auch kein `.nojekyll`. Alle Actions sind auf Commit-SHAs gepinnt.
 
 Es gibt vorerst nur diese eine Stufe. Eine Teststufe ist für später geplant.
 
@@ -115,16 +115,13 @@ Renovate hält Abhängigkeiten und Actions aktuell. Neue Versionen werden erst n
 
 ### Einmalig einrichten
 
-Diese Einstellungen stehen nicht im Code und müssen einmal von Hand gesetzt werden (Stand in `docs/todo.md`):
+Diese Einstellungen stehen nicht im Code und müssen einmal von Hand gesetzt werden. Der Umzug aus `larmic/mitwachsen-spiele` und sein Stand stehen in larmic/mitwachsen-spiele#71.
 
-1. **DNS** beim Domain-Anbieter für `mitwachsen-spiele.de`:
-   - `www` als `CNAME` auf `larmic.github.io`
-   - die Domain ohne `www` (`@`) mit `A`-Einträgen auf `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
-   - und `AAAA`-Einträgen auf `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153`
-2. **Domain verifizieren** (Profil → Settings → Pages → „Add a domain“, TXT-Eintrag): Dann kann kein fremdes Repo die Domain übernehmen.
-3. **GitHub Pages** (Repo → Settings → Pages): Quelle „GitHub Actions“, Custom domain `www.mitwachsen-spiele.de`, nach dem DNS-Check „Enforce HTTPS“ anhaken. Die Domain ohne `www` leitet GitHub dann selbst auf `www` weiter.
-4. **Renovate**: der Renovate-App (GitHub App „Renovate“ von Mend) Zugriff auf dieses Repo geben.
-5. **Branch-Schutz** für `main` (Settings → Rules oder Branches): Pflicht-Check „Guard-Gates und Build“. Ohne ihn übernimmt Renovate Updates per Automerge, ohne dass die Gates grün sein müssen.
+1. **DNS** bei OVH für `mitwachsen-spiele.de`: `weltenbummler` als `CNAME` auf `mitwachsen-spiele.github.io.`. Erst die Domain in GitHub eintragen (Schritt 3), dann den DNS-Eintrag; beim Rückbau umgekehrt, erst DNS löschen.
+2. **Domain verifizieren** in der Organisation `mitwachsen-spiele` (Settings → Pages → „Add a domain“, TXT `_github-pages-challenge-mitwachsen-spiele`): Dann kann kein fremdes Repo die Domain oder eine ihrer Subdomains übernehmen.
+3. **GitHub Pages** (Repo → Settings → Pages): Quelle „GitHub Actions“, Custom domain `weltenbummler.mitwachsen-spiele.de`, nach dem DNS-Check „Enforce HTTPS“ anhaken.
+4. **Renovate**: Die Renovate-App (Mend) ist in der Organisation für alle Repos installiert. Die gemeinsamen Regeln stehen in [mitwachsen-spiele/renovate-config](https://github.com/mitwachsen-spiele/renovate-config), `renovate.json` hier ergänzt nur Eigenes.
+5. **Ruleset `protect main`** (Settings → Rules): Löschen und Force-Push verboten, Pflicht-Check `Guard-Gates`. Ohne ihn übernimmt Renovate Updates per Automerge, ohne dass die Gates grün sein müssen.
 
 ## Datenschutz und Recht
 
