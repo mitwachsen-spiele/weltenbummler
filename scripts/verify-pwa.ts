@@ -29,7 +29,8 @@ const DIST = 'dist';
  * Gezählt ohne Three.js (`PRECACHE_WITHOUT`): Dessen Größe hängt an seiner Version und hat im Bundle-Gate eine eigene
  * Grenze (gemessen + 5 %, scripts/verify-bundles.ts). So gelten die 10 % Luft für das, was das Spiel selbst wächst,
  * statt zur Hälfte für eine fremde Bibliothek; zusammen bleibt alles durch beide Grenzen gedeckelt.
- * Gemessen 758,4 KiB (mit Three.js 1276,1 KiB, mit den Dingen der Welt aus einer Quelle), Grenze gemessen + 10 %. Angehoben wird erst, wenn
+ * Gemessen 802,2 KiB (27.11.2026, nach Issue 13); Grenze gemessen + 10 % zuletzt gesetzt bei 758,4 KiB (mit Three.js
+ * 1276,1 KiB, mit den Dingen der Welt aus einer Quelle). Angehoben wird erst, wenn
  * weniger als 3 % Luft bleiben, dann wieder auf gemessen + 10 %, mit einem Satz Begründung in der Commit-Nachricht.
  */
 const PRECACHE_BUDGET = 834 * 1024;
