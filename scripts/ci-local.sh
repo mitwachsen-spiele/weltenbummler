@@ -44,7 +44,7 @@ BASE=mcr.microsoft.com/playwright:v$PW-noble
 
 # Stand, der geprüft wird: Arbeitsbaum über einen eigenen Index als Tree, so wie git ihn committen würde
 TMP=$(mktemp -d)
-NAME=mw-ci-local-$$-$(now)
+NAME=wb-ci-local-$$-$(now)
 cleanup() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true
   rm -rf "$TMP"
@@ -57,16 +57,16 @@ TREE=$(GIT_INDEX_FILE=$TMP/index git write-tree)
 
 # Image mit den Abhängigkeiten, benannt nach package-lock.json, .nvmrc und Basis-Image (Skripte in package.json zählen nicht)
 DEPS_HASH=$(cat package-lock.json .nvmrc <(echo "$BASE") | sha256 | cut -c1-16)
-DEPS=mw-ci-deps:$DEPS_HASH
+DEPS=wb-ci-deps:$DEPS_HASH
 if ! docker image inspect "$DEPS" >/dev/null 2>&1; then
   echo "gates:ci: baue Abhängigkeiten ($DEPS, einmal je package-lock.json) …"
   mkdir "$TMP/ctx"
   cp package.json package-lock.json "$TMP/ctx/"
   printf '%s\n' "FROM $BASE" 'WORKDIR /work' 'COPY package.json package-lock.json ./' \
-    'RUN npm ci --no-audit --no-fund' 'LABEL mw-ci-deps=1' >"$TMP/ctx/Dockerfile"
+    'RUN npm ci --no-audit --no-fund' 'LABEL wb-ci-deps=1' >"$TMP/ctx/Dockerfile"
   tar -C "$TMP/ctx" -c . | docker build -q -t "$DEPS" - >/dev/null
   # Ältere Fassungen aufräumen, sie werden nie wieder gebraucht
-  docker images --filter label=mw-ci-deps=1 --format '{{.Repository}}:{{.Tag}}' | grep -vx "$DEPS" |
+  docker images --filter label=wb-ci-deps=1 --format '{{.Repository}}:{{.Tag}}' | grep -vx "$DEPS" |
     while read -r old; do docker rmi "$old" >/dev/null 2>&1 || true; done || true
 fi
 NODE_WANT=$(cat .nvmrc)

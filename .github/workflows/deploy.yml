@@ -252,9 +252,31 @@ jobs:
       - name: Wackelige Browser-Tests in die Zusammenfassung
         run: node scripts/flaky-summary.ts
 
+  # Ein einziger Pflicht-Check für das Ruleset „protect main“ (und damit für Renovates Automerge): grün nur, wenn alle
+  # Gates grün sind. Läuft immer (auch wenn ein Gate rot ist oder abgebrochen wurde), damit der Check nie fehlt;
+  # übersprungen zählt als rot. Neue Gate-Jobs hier unter needs eintragen.
+  guard-gates:
+    name: Guard-Gates
+    needs: [static, coverage, build, e2e-site, e2e-game]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Alle Gates grün?
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Ergebnisse: $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" != "success" ]; then
+              echo "::error title=Guard-Gates::Mindestens ein Gate ist nicht grün ($r)"
+              exit 1
+            fi
+          done
+
   deploy:
     name: Deploy auf GitHub Pages
-    needs: [static, coverage, build, e2e-site, e2e-game]
+    needs: [guard-gates]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10

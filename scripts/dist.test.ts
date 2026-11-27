@@ -32,7 +32,7 @@ describe('Externe Ressourcen', () => {
 
   it('erlaubt Links und Hinweise, die nichts laden', () => {
     const html = `
-      <a href="https://github.com/larmic/mitwachsen-spiele">GitHub</a>
+      <a href="https://github.com/mitwachsen-spiele/weltenbummler">GitHub</a>
       <link rel="canonical" href="https://www.mitwachsen-spiele.de/">
       <link rel="alternate" href="https://example.com/feed.xml">
       <meta property="og:image" content="https://www.mitwachsen-spiele.de/og.png">
