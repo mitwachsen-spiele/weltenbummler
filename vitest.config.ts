@@ -10,7 +10,7 @@ import { budgetMs, calibrate } from './scripts/test-budget.ts';
 // nach Last des Rechners. Langsam wird darum nur gemeldet: Tests über dem Budget (scripts/test-budget.ts: 4 s auf dem
 // Bezugsrechner mit Abdeckung, relativ zur Geschwindigkeit dieses Rechners) markiert der Bericht. Damit die Laufzeit
 // nicht mit jeder Welt wächst, laufen Eigenschafts-Tests über SAMPLE_SEEDS und REGRESSION_SEEDS (`seedsFor` in
-// test-worlds.ts), die vollen Seed-Bereiche im tiefen Lauf (`npm run test:deep`, MITWACHSEN_DEEP=1, Job static der
+// test-worlds.ts), die vollen Seed-Bereiche im tiefen Lauf (`npm run test:deep`, MITWACHSEN_DEEP=1, Job deep der
 // Pipeline und gates:ci).
 // Welten kommen über `worldOf`/`bareOf` (test-worlds.ts), kein `expect` in Schleifen je Takt oder Feld.
 const CI = !!process.env.CI;
@@ -32,7 +32,7 @@ class ByFolder extends BaseSequencer {
 }
 /**
  * Tiefer Lauf: Welten über das Ende einer Datei behalten (test-deep-setup.ts) nur, wo der Speicher reicht: ab 2 GB je
- * Kern (Speicher des Rechners, im Container seine Grenze, durch die Kerne; gates:ci 3,5 GB mit einem Worker, Job static
+ * Kern (Speicher des Rechners, im Container seine Grenze, durch die Kerne; gates:ci 3,5 GB mit einem Worker, Job deep
  * 4 GB), und nur, solange der Worker unter 65 % seines Heaps liegt. Gemessen mit einem Worker auf 2 Kernen: höchstens
  * 1,4 GB Heap nach einer Datei, 1,6 GB RSS (Heap-Grenze 2,2 GB). Lokal mit vielen Kernen: alles vergessen wie bisher
  */

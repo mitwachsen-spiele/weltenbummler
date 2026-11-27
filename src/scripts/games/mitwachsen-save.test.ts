@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_FIGURE,
   INDEX_KEY,
   cleanName,
   deleteWorld,
@@ -67,7 +68,7 @@ describe('Welten speichern', () => {
     const index = loadIndex(store);
     expect(index.worlds.map((w) => [w.id, w.worldName, w.figureName])).toEqual([
       ['a', 'Umbenannt', 'Mo'],
-      ['b', 'Zweite', 'Bobo'],
+      ['b', 'Zweite', DEFAULT_FIGURE],
     ]);
     expect(index.current).toBe('a');
   });
@@ -114,7 +115,7 @@ describe('Welten speichern', () => {
     store.setItem(INDEX_KEY, JSON.stringify({ v: 4, worlds: [{ id: 'a' }, 42, { nope: true }], current: 'weg' }));
     expect(loadIndex(store)).toEqual({
       v: 5,
-      worlds: [{ id: 'a', worldName: 'Meine Welt', figureName: 'Bobo' }],
+      worlds: [{ id: 'a', worldName: 'Meine Welt', figureName: DEFAULT_FIGURE }],
       current: 'a',
     });
   });
@@ -295,6 +296,12 @@ describe('Namen und Welt-Code', () => {
     expect(cleanName('Ömer & Jö', 'X')).toBe('Ömer  Jö');
     expect(cleanName('<>{}', 'Ersatz')).toBe('Ersatz');
     expect(cleanName('a'.repeat(40), 'X')).toHaveLength(16);
+  });
+
+  it('die Figur heißt ohne eigenen Namen Jonas, auch bei leerem oder ungültigem Namen', () => {
+    expect(DEFAULT_FIGURE).toBe('Jonas');
+    expect(newWorld('neu', 1, 'Meine Welt').figureName).toBe('Jonas');
+    expect(newWorld('leer', 1, 'Meine Welt', '<>').figureName).toBe('Jonas');
   });
 
   it('macht aus dem Seed einen Code und zurück', () => {
