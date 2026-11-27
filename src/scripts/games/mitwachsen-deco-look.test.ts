@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Cell, Deco } from './mitwachsen-cell';
 import { PILZ_OVER } from './mitwachsen-home';
-import { decoBoxes, fenceBoxes, lilyBoxes, shelterBoxes, type Neighbours, type Shelter } from './mitwachsen-deco-look';
+import { decoBoxes, lilyBoxes, shelterBoxes, type Neighbours, type Shelter } from './mitwachsen-deco-look';
+import { fenceBoxes } from './mitwachsen-yard-look';
 import { haloCompact } from '../../lib/games/shade';
 import { TREE_HULL, treeBoxes } from './mitwachsen-tree-look';
 import type { Box } from './mitwachsen-view';
@@ -19,6 +20,13 @@ const around = (map: Record<string, Deco>): Neighbours => ({ cell: (x, y) => ({ 
 const SHELTER: Shelter = { x0: 10, y0: 20, x1: 16, y1: 22 };
 const at = (deco: Deco, extra: Partial<Cell> = {}, world = around({}), picked = {}) =>
   decoBoxes(world, cell(deco, extra), 3, 5, picked, () => SHELTER);
+
+/** Rauminhalt, den sich zwei Quader teilen */
+const shared = (a: Box, b: Box) => {
+  const along = (lo: number, len: number, lo2: number, len2: number) =>
+    Math.max(0, Math.min(lo + len, lo2 + len2) - Math.max(lo, lo2));
+  return along(a[0], a[3], b[0], b[3]) * along(a[1], a[4], b[1], b[4]) * along(a[2], a[5], b[2], b[5]);
+};
 
 const OWN: Deco[] = [
   'tree',
@@ -94,7 +102,53 @@ describe('Dinge aus einer Quelle für 2D und 3D (decoBoxes)', () => {
     expect(at('crystal')![0]![6]).toBe('#b48cf0');
     const shroom = at('bigshroom', { color: '#9b78e0' })!;
     expect(shroom.filter((b) => b[8] === 'see' && b[6] === '#9b78e0')).toHaveLength(2);
-    expect(at('bigshroom')![1]![6]).toBe('#d9473a');
+    expect(at('bigshroom')!.find((b) => b[8] === 'see')![6]).toBe('#d9473a');
+  });
+
+  it.each(OWN.filter((d) => d !== 'cloudpuff' && d !== 'stalagmite'))(
+    '%s ist fein: Muster oder Leuchten auf seinen Teilen (Entwurf „Feine Grafik“)',
+    (deco) => {
+      expect(at(deco)!.some((b) => b[9]?.skin || b[9]?.halo)).toBe(true);
+    },
+  );
+
+  // Bäume und Busch ausgenommen: Die Ausbuchtungen ihrer Krone ragen in die Hauptkrone (Laub, Spec „Teile stoßen aneinander“)
+  it.each([...OWN.filter((d) => d !== 'tree' && d !== 'bush'), 'shelterpilz' as const])(
+    '%s: Teile stoßen aneinander, keins steckt in einem anderen (auch Ring und Kragen um den Stiel)',
+    (deco) => {
+      const boxes = at(deco)!;
+      for (const [i, a] of boxes.entries())
+        for (const b of boxes.slice(i + 1)) expect(shared(a, b), JSON.stringify([a, b])).toBeLessThan(1e-6);
+    },
+  );
+
+  it('Plättchen (Lichtkanten, Riss, Rippen, nasser Glanz) liegen vorn auf einer Fläche ihres Dings, nicht in der Luft', () => {
+    for (const deco of ['crystal', 'mushroom', 'boulder', 'cactus', 'stalagmite'] as const) {
+      const boxes = at(deco)!;
+      const plates = boxes.filter((b) => b[4] <= 0.005 + 1e-9);
+      expect(plates.length, deco).toBeGreaterThan(0);
+      for (const p of plates) {
+        const carrier = boxes.some(
+          (b) =>
+            b !== p &&
+            Math.abs(b[1] + b[4] - p[1]) < 0.02 &&
+            b[0] <= p[0] + 1e-9 &&
+            b[0] + b[3] >= p[0] + p[3] - 1e-9 &&
+            b[2] <= p[2] + 1e-9 &&
+            b[2] + b[5] >= p[2] + p[5] - 1e-9,
+        );
+        expect(carrier, `${deco} ${JSON.stringify(p)}`).toBe(true);
+      }
+    }
+  });
+
+  it('Pilzhüte glänzen (`lack`), Stiele haben Fasern, Kaktus Stacheln (`nadel`), Farn und Seerose Blätter', () => {
+    const skins = (deco: Deco) => new Set(at(deco)!.map((b) => b[9]?.skin));
+    expect(skins('bigshroom')).toEqual(new Set([undefined, 'haar', 'lack']));
+    expect(skins('shelterpilz').has('lack') && skins('shelterpilz').has('haar')).toBe(true);
+    expect(skins('cactus').has('nadel')).toBe(true);
+    expect(skins('fern').has('blatt') && skins('lily').has('blatt')).toBe(true);
+    expect(skins('boulder').has('fell')).toBe(true); // Moos
   });
 
   it('kleiner Pilz: Stiel, Hut mit Kuppe leuchtet kompakt, Tupfen vorn auf dem Hut', () => {
@@ -150,11 +204,11 @@ describe('Hecke, Rosenbogen und Zaun verbinden sich mit ihren Nachbarn', () => {
     expect(new Set(posts(along)).size).toBe(1); // hintereinander
   });
 
-  it('Zaun: Pfosten und eine Latte je Nachbar mit Zaun oder Tor', () => {
+  it('Zaun: Pfosten mit Kappe und eine Latte je Nachbar mit Zaun oder Tor', () => {
     const world = around({ '3,4': 'fence', '2,5': 'gate', '4,5': 'fence', '3,6': 'fence' });
-    expect(fenceBoxes(world, 3, 5, 1)).toHaveLength(5);
-    expect(fenceBoxes(around({}), 3, 5, 1)).toHaveLength(1);
-    expect(fenceBoxes(world, 3, 5, 1).every((b) => b[9]?.skin === 'holz')).toBe(true);
+    expect(fenceBoxes(world, 3, 5, 1)).toHaveLength(6);
+    expect(fenceBoxes(around({}), 3, 5, 1)).toHaveLength(2);
+    expect(fenceBoxes(world, 3, 5, 1).every((b) => b[9]?.skin === 'holz' || b[5] < 0.1)).toBe(true);
   });
 
   it('Gartentor: Flügel klappt beim Öffnen zur Seite weg, offen ist er weg', () => {

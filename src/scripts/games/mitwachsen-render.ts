@@ -45,7 +45,17 @@ import {
 import { carried } from './mitwachsen-carry';
 import { grown } from './mitwachsen-growth';
 import { drawBox, drawDeco, placeRails, type Box, type DecoAt, type View2D } from './mitwachsen-view';
-import { decoBoxes, fenceBoxes } from './mitwachsen-deco-look';
+import { decoBoxes } from './mitwachsen-deco-look';
+import {
+  SIGN_TOP,
+  WOOD_BED,
+  bedBoxes,
+  bridgeBoxes,
+  fenceBoxes,
+  signBoxes,
+  signWidth,
+  sleeperBoxes,
+} from './mitwachsen-yard-look';
 import { clampRow, rowCache, sortBoxes } from './mitwachsen-row';
 import { drawStone, heardStone } from './mitwachsen-story';
 import type { WeatherLook } from './mitwachsen-weather';
@@ -118,8 +128,6 @@ export type Scene = {
   rides: readonly RideBody[]; // Fahrzeug aus einem Welt-Paket (Schlitten, Zugtier, Laternenpfahl; die Figur sitzt darin)
 };
 
-/** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee: `BED_SNOW`) */
-const BED_FRAME: readonly [string, string] = [GAME_COLORS.bed.frame, GAME_COLORS.bed.frame];
 /** Weicher Fleck unter Dingen in 2D: Mitte (Felder nach vorn) und Halbbreite des Fußes */
 const SHADOW: Partial<Record<Deco, readonly [number, number]>> = {
   tree: [0.55, 0.45],
@@ -715,20 +723,16 @@ export class Renderer {
       case 'gate':
         for (const b of clampRow(fenceBoxes(world, x, y, h, 1 - (sc.gates.get(c.gate!) ?? 0)), y)) drawBox(ctx, P, b);
         break;
-      case 'bridge': {
-        const t = sc.gates.get(c.gate!) ?? 0;
-        if (t > 0) box(ctx, P, x, y + 0.5 - t / 2, 0.82, 1, t, 0.18, '#a0703f', '#c0915b');
+      case 'bridge':
+        for (const b of bridgeBoxes(x, y, sc.gates.get(c.gate!) ?? 0)) drawBox(ctx, P, b);
+        break;
+      case 'bed': {
+        // Bett aus Holz (in der Eis-Welt aus Schnee), schläft die Figur, liegt sie darin (mitwachsen-yard-look.ts)
+        const bed = bedBoxes(x, y, h, c.biome === 'eis' ? [...BED_SNOW, 'schnee'] : WOOD_BED);
+        const sleeper = state.sleeping ? sleeperBoxes(x, y, h, sc.look) : [];
+        for (const b of sortBoxes([...bed, ...sleeper])) drawBox(ctx, P, b);
         break;
       }
-      case 'bed':
-        box(ctx, P, x + 0.06, y + 0.05, h, 0.88, 0.9, 0.28, ...(c.biome === 'eis' ? BED_SNOW : BED_FRAME));
-        box(ctx, P, x + 0.1, y + 0.08, h + 0.28, 0.8, 0.26, 0.12, GAME_COLORS.bed.pillow);
-        if (state.sleeping) {
-          box(ctx, P, x + 0.32, y + 0.1, h + 0.4, 0.36, 0.22, 0.3, sc.look.skin);
-          box(ctx, P, x + 0.31, y + 0.09, h + 0.62, 0.38, 0.24, 0.1, sc.look.hair);
-        }
-        box(ctx, P, x + 0.08, y + 0.34, h + 0.28, 0.84, 0.6, state.sleeping ? 0.22 : 0.1, GAME_COLORS.bed.blanket);
-        break;
       case 'sign':
         this.sign(P, state, x, y, h, c);
         break;
@@ -740,16 +744,15 @@ export class Renderer {
     const { ctx } = this;
     const gate = GATES.find((g) => g.id === c.sign)!;
     const region = REGIONS.find((r) => r.id === gate.region)!;
-    box(ctx, P, x + 0.44, y + 0.44, h, 0.12, 0.12, 0.6, GAME_COLORS.fenceDark);
     const n = region.animals.length;
-    const width = Math.max(1, n * 0.55);
-    box(ctx, P, x + 0.5 - width / 2, y + 0.38, h + 0.6, width, 0.2, 0.5, GAME_COLORS.board, '#d4a874');
+    const width = signWidth(n);
+    for (const b of signBoxes(x, y, h, n)) drawBox(ctx, P, b);
     region.animals.forEach((a, i) => {
       const met = state.met.includes(`${region.id}:${a.species}`);
       const sp = SPECIES[a.species];
       const cx = x + 0.5 - width / 2 + 0.275 + i * 0.55;
       if (!met) ctx.globalAlpha = 0.55;
-      drawModel(ctx, P, sp.parts, cx, y + 0.48, h + 1.1, 's', sp.scale * 0.5, met ? undefined : GAME_COLORS.ink);
+      drawModel(ctx, P, sp.parts, cx, y + 0.48, h + SIGN_TOP, 's', sp.scale * 0.5, met ? undefined : GAME_COLORS.ink);
       ctx.globalAlpha = 1;
     });
   }

@@ -1,155 +1,55 @@
 // Dinge der Welt aus Quadern, eine Quelle für 2D und 3D (`Box`, wie die Dinge der Welt-Pakete): Bäume und Beerenbüsche
 // (mitwachsen-tree-look.ts), Blume, Farn, Findling, Pilz, Schilf, Seerose, Kaktus, Kristall, Stalagmit, Riesenpilz,
-// Tröge, Wolkenpuff, Hecke, Rosenbogen, Zaun und Gartentor, der Riesenpilz am Unterstand. Was sich bewegt oder Regeln
-// zeigt (Tafel, Bett samt Schläfer, Klangstein, Brücke, große Tore, Plattformen), zeichnen die Ansichten selbst.
+// Wolkenpuff, der Riesenpilz am Unterstand; Tröge, Hecke, Rosenbogen und Zaun aus mitwachsen-yard-look.ts. Alles fein
+// (Entwurf „Feine Grafik“): Muster je Material, Zusatzquader (Blütenmitte, Moos, Stacheln, Lamellen, Lichtkanten), nie
+// Kacheln des Geländes. Bett, Tafel, Gartentor und Brücke (ebenfalls yard-look) und Klangstein, große Tore, Plattformen
+// geben die Ansichten selbst in Auftrag, weil sie an Zustand hängen.
 // In 2D kommen die Quader eines Felds in seiner Reihe dran (`clampRow`, mitwachsen-row.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Bild“)
 
 import type { Fine } from '../../lib/games/front';
-import { GAME_COLORS } from '../../data/games/mitwachsen';
 import type { Cell } from './mitwachsen-cell';
 import { PILZ_OVER } from './mitwachsen-home';
 import { bushBoxes, mix, sketch, treeBoxes } from './mitwachsen-tree-look';
 import type { Box } from './mitwachsen-view';
+import { PLATE, fenceBoxes, hedgeBoxes, troughBoxes, type Neighbours } from './mitwachsen-yard-look';
 
-/** Wo die Nachbarn liegen (Hecke, Zaun, Rosenbogen verbinden sich mit ihnen) */
-export type Neighbours = { cell(x: number, y: number): Pick<Cell, 'deco'> };
+export type { Neighbours } from './mitwachsen-yard-look';
 /** Fläche des Unterstands, über dem der Hut des Riesenpilzes liegt (Felder, einschließlich) */
 export type Shelter = { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number };
 
-const HOLZ: Fine = { skin: 'holz' },
-  BLATT: Fine = { skin: 'blatt' },
+const BLATT: Fine = { skin: 'blatt' },
+  NADEL: Fine = { skin: 'nadel' },
+  LACK: Fine = { skin: 'lack' },
+  FASER: Fine = { skin: 'haar' }, // Fasern am Pilzstiel
+  MOOS: Fine = { skin: 'fell' },
   GLOW: Fine = { halo: true };
-const LEAF = '#3f9a3c',
-  LEAF_TOP = '#5ab651';
 
-/** Seerose auf dem Wasser (Höhe 0,83, knapp über der Wasserfläche 0,82) */
+/** Seerose auf dem Wasser (Höhe 0,83, knapp über der Wasserfläche 0,82): Blatt mit Kerbe vorn, Blüte mit gelber Mitte */
 export const lilyBoxes = (x: number, y: number): Box[] => [
-  [x + 0.25, y + 0.3, 0.83, 0.5, 0.4, 0.03, '#4f9a3c', '#6dbd47'],
-  [x + 0.45, y + 0.42, 0.86, 0.12, 0.12, 0.06, '#e77fb3', '#e77fb3'],
+  [x + 0.25, y + 0.3, 0.83, 0.5, 0.28, 0.03, '#4f9a3c', '#6dbd47', undefined, BLATT],
+  [x + 0.25, y + 0.58, 0.83, 0.3, 0.12, 0.03, '#4f9a3c', '#6dbd47', undefined, BLATT], // rechts vorn die Kerbe
+  [x + 0.45, y + 0.42, 0.86, 0.12, 0.12, 0.06, '#e77fb3', '#f4b6d4'],
+  [x + 0.48, y + 0.45, 0.92, 0.06, 0.06, 0.015, '#f2d14b', '#f2d14b'],
 ];
 
-/** Zaun: Pfosten in der Mitte, Latten zu jedem Nachbarn mit Zaun oder Tor; `closed` < 1 öffnet ein Gartentor */
-export function fenceBoxes(world: Neighbours, x: number, y: number, h: number, closed = 1): Box[] {
-  const joins = (dx: number, dy: number) => {
-    const d = world.cell(x + dx, y + dy).deco;
-    return d === 'fence' || d === 'gate';
+/**
+ * Ring um einen Stiel aus vier Quadern (hinten, links, rechts, vorn), die außen an den Stiel stoßen, statt ihn zu
+ * umschließen: `ring` ist der äußere Umriss, `wall` die Breite des Rings rundum
+ */
+function collar(ring: Box, wall: number): Box[] {
+  const [x, y, , w, d] = ring;
+  const piece = (px: number, py: number, pw: number, pd: number): Box => {
+    const b: Box = [...ring];
+    [b[0], b[1], b[3], b[4]] = [px, py, pw, pd];
+    return b;
   };
-  const wood = (bx: number, by: number, bz: number, w: number, d: number, hh: number): Box => [
-    bx,
-    by,
-    bz,
-    w,
-    d,
-    hh,
-    GAME_COLORS.fence,
-    GAME_COLORS.fenceDark,
-    undefined,
-    HOLZ,
+  return [
+    piece(x, y, w, wall),
+    piece(x, y + wall, wall, d - 2 * wall),
+    piece(x + w - wall, y + wall, wall, d - 2 * wall),
+    piece(x, y + d - wall, w, wall),
   ];
-  if (world.cell(x, y).deco === 'gate') {
-    // Torflügel: offen klappt er zur Seite weg (wird schmaler)
-    if (closed <= 0) return [];
-    return joins(0, -1) || joins(0, 1)
-      ? [wood(x + 0.42, y + 0.5 - 0.5 * closed, h, 0.16, closed, 0.8)]
-      : [wood(x + 0.5 - 0.5 * closed, y + 0.42, h, closed, 0.16, 0.8)];
-  }
-  const out = [wood(x + 0.4, y + 0.4, h, 0.2, 0.2, 0.8)];
-  // Latten vom Pfosten bis zum Feldrand (stecken nicht im Pfosten: 2D malt sich Durchdringendes falsch)
-  if (joins(0, -1)) out.push(wood(x + 0.45, y, h + 0.3, 0.1, 0.4, 0.12));
-  if (joins(-1, 0)) out.push(wood(x, y + 0.45, h + 0.3, 0.4, 0.1, 0.12));
-  if (joins(1, 0)) out.push(wood(x + 0.6, y + 0.45, h + 0.3, 0.4, 0.1, 0.12));
-  if (joins(0, 1)) out.push(wood(x + 0.45, y + 0.6, h + 0.3, 0.1, 0.4, 0.12));
-  return out;
-}
-
-/** Hecke um den Garten: Blätterbüsche, verbunden mit Nachbarn mit Hecke; der Rosenbogen ist der Eingang */
-function hedgeBoxes(world: Neighbours, x: number, y: number, h: number, arch: boolean): Box[] {
-  const joins = (dx: number, dy: number) => {
-    const d = world.cell(x + dx, y + dy).deco;
-    return d === 'hedge' || d === 'arch';
-  };
-  const leaf = (bx: number, by: number, bz: number, w: number, d: number, hh: number, see = true): Box => [
-    bx,
-    by,
-    bz,
-    w,
-    d,
-    hh,
-    LEAF,
-    LEAF_TOP,
-    see ? 'see' : undefined,
-    BLATT,
-  ];
-  if (arch) {
-    const vertical = joins(0, -1) || joins(0, 1);
-    const at = (along: number, across: number, w: number, d: number): [number, number, number, number] =>
-      vertical ? [x + across, y + along, d, w] : [x + along, y + across, w, d];
-    const out: Box[] = [0.02, 0.82].map((p) => {
-      const [bx, by, w, d] = at(p, 0.38, 0.16, 0.2);
-      return [bx, by, h, w, d, 1.3, GAME_COLORS.fenceDark, GAME_COLORS.fence, undefined, HOLZ];
-    });
-    const [bx, by, w, d] = at(0, 0.34, 1, 0.28);
-    out.push(leaf(bx, by, h + 1.3, w, d, 0.2, false));
-    for (let i = 0; i < 4; i++) {
-      const [rx, ry, rw, rd] = at(0.12 + i * 0.22, 0.43, 0.1, 0.1);
-      const rose = i % 2 ? '#e77fb3' : '#ffffff';
-      out.push([rx, ry, h + 1.5, rw, rd, 0.07, rose, rose]);
-    }
-    return out;
-  }
-  const out: Box[] = [];
-  // Verbindungen vom Busch in der Mitte bis zum Feldrand
-  if (joins(0, -1)) out.push(leaf(x + 0.2, y, h, 0.6, 0.15, 0.7));
-  if (joins(-1, 0)) out.push(leaf(x, y + 0.2, h, 0.15, 0.6, 0.7));
-  if (joins(1, 0)) out.push(leaf(x + 0.85, y + 0.2, h, 0.15, 0.6, 0.7));
-  if (joins(0, 1)) out.push(leaf(x + 0.2, y + 0.85, h, 0.6, 0.15, 0.7));
-  out.push(leaf(x + 0.15, y + 0.15, h, 0.7, 0.7, 0.75));
-  if ((x * 31 + y * 17) % 3 === 0) out.push([x + 0.45, y + 0.5, h + 0.75, 0.1, 0.1, 0.05, '#f2d14b', '#f2d14b', 'see']);
-  return out;
-}
-
-/** Trog aus Holz auf vier Füßchen: Futter (Heu und Möhren) oder Wasser */
-function troughBoxes(x: number, y: number, h: number, water: boolean): Box[] {
-  const [wood, woodTop] = ['#8a5a30', '#a0703f'];
-  const plank = (bx: number, by: number, bz: number, w: number, d: number, hh: number): Box => [
-    x + bx,
-    y + by,
-    h + bz,
-    w,
-    d,
-    hh,
-    wood,
-    woodTop,
-    undefined,
-    HOLZ,
-  ];
-  const out: Box[] = [
-    ...(
-      [
-        [0.1, 0.2],
-        [0.8, 0.2],
-        [0.1, 0.72],
-        [0.8, 0.72],
-      ] as const
-    ).map(([fx, fy]): Box => [x + fx, y + fy, h, 0.1, 0.1, 0.12, '#7a5432', '#7a5432', undefined, HOLZ]),
-    plank(0.05, 0.15, 0.12, 0.9, 0.72, 0.08),
-    plank(0.05, 0.15, 0.2, 0.9, 0.08, 0.28),
-    plank(0.05, 0.23, 0.2, 0.08, 0.56, 0.28),
-    plank(0.87, 0.23, 0.2, 0.08, 0.56, 0.28),
-  ];
-  if (water) out.push([x + 0.13, y + 0.23, h + 0.2, 0.74, 0.56, 0.22, '#3f8fd8', '#7fc0f0']);
-  else {
-    out.push([x + 0.13, y + 0.23, h + 0.2, 0.74, 0.56, 0.26, '#d9b85a', '#ecd27a']); // Heu
-    for (const [fx, fy] of [
-      [0.25, 0.35],
-      [0.55, 0.5],
-      [0.7, 0.3],
-    ] as const)
-      out.push([x + fx, y + fy, h + 0.46, 0.14, 0.06, 0.06, '#f08a3c', '#f08a3c']); // Möhren
-  }
-  out.push(plank(0.05, 0.79, 0.2, 0.9, 0.08, 0.28)); // vorn zuletzt
-  return out;
 }
 
 /** Oberseiten der drei Stufen des Huts am Unterstand über dem Boden: Darauf liegen die Tupfen */
@@ -174,12 +74,13 @@ export function shelterBoxes(x: number, y: number, h: number, { x0, y0, x1, y1 }
     c,
     t,
     'see',
+    c === red ? LACK : undefined,
   ];
   const dot = (bx: number, by: number, bz: number, bw: number, bd: number, hh: number) =>
     cap(bx, by, bz, bw, bd, hh, '#ffffff', '#ffffff');
   return [
-    [x + 0.15, y + 0.15, h, 0.7, 0.7, 3.2, stem, stemTop],
-    [x - 0.05, y - 0.05, h + 2.2, 1.1, 1.1, 0.25, stem, stemTop], // Kragen
+    [x + 0.15, y + 0.15, h, 0.7, 0.7, 3.2, stem, stemTop, undefined, FASER],
+    ...collar([x - 0.05, y - 0.05, h + 2.2, 1.1, 1.1, 0.25, stem, stemTop, undefined, FASER], 0.2), // Kragen um den Stiel
     cap(cx0 + 0.05, cz0 + 0.05, h + 3.15, w - 0.1, d - 0.1, 0.05, '#f3e6c8', '#f3e6c8'), // Lamellen unten
     cap(cx0, cz0, h + 3.2, w, d, 0.45), // Hutrand
     cap(cx0 + 0.9, cz0 + 0.7, h + 3.65, w - 1.8, d - 1.4, 0.45),
@@ -230,7 +131,17 @@ function mushroomBoxes(x: number, y: number, h: number): Box[] {
 }
 
 /** Ein Quader relativ zur Ecke des Felds (x, y) in Höhe h */
-type Q = (bx: number, by: number, bz: number, w: number, d: number, hh: number, side: string, top?: string) => Box;
+type Q = (
+  bx: number,
+  by: number,
+  bz: number,
+  w: number,
+  d: number,
+  hh: number,
+  side: string,
+  top?: string,
+  fine?: Fine,
+) => Box;
 
 /** Dinge der Themenwelten: Kaktus (Sand), Kristall (Höhle, leuchtet), Stalagmit, Wolkenpuff (null: keins davon) */
 function themedBoxes(c: Cell, x: number, y: number, h: number, q: Q): Box[] | null {
@@ -238,12 +149,16 @@ function themedBoxes(c: Cell, x: number, y: number, h: number, q: Q): Box[] | nu
     case 'cactus': {
       const [g, t] = ['#3f8f3a', '#5aab4a'];
       return [
-        q(0.37, 0.37, 0, 0.26, 0.26, 1.35, g, t),
-        q(0.13, 0.42, 0.55, 0.24, 0.16, 0.16, g, t),
-        q(0.13, 0.42, 0.55, 0.14, 0.16, 0.55, g, t),
-        q(0.63, 0.42, 0.8, 0.24, 0.16, 0.16, g, t),
-        q(0.73, 0.42, 0.8, 0.14, 0.16, 0.45, g, t),
-        q(0.44, 0.44, 1.35, 0.12, 0.12, 0.1, '#f08cc8'), // Blüte
+        q(0.37, 0.37, 0, 0.26, 0.26, 1.35, g, t, NADEL),
+        q(0.13, 0.42, 0.55, 0.24, 0.16, 0.16, g, t, NADEL),
+        q(0.13, 0.42, 0.71, 0.14, 0.16, 0.39, g, t, NADEL),
+        q(0.63, 0.42, 0.8, 0.24, 0.16, 0.16, g, t, NADEL),
+        q(0.73, 0.42, 0.96, 0.14, 0.16, 0.29, g, t, NADEL),
+        // Rippen vorn (helle Lichtkanten) und Blüte mit gelber Mitte
+        q(0.41, 0.63, 0.1, 0.03, PLATE, 1.1, '#7cc46a'),
+        q(0.55, 0.63, 0.2, 0.03, PLATE, 1.0, '#7cc46a'),
+        q(0.44, 0.44, 1.35, 0.12, 0.12, 0.1, '#f08cc8', '#f6b0dc'),
+        q(0.48, 0.48, 1.45, 0.04, 0.04, 0.015, '#f2d14b'),
       ];
     }
     case 'crystal':
@@ -253,13 +168,19 @@ function themedBoxes(c: Cell, x: number, y: number, h: number, q: Q): Box[] | nu
         q(0.22, 0.22, 0, 0.56, 0.56, 0.5, '#2a2c33', '#3c3f47'),
         q(0.32, 0.32, 0.5, 0.36, 0.36, 0.5, '#2a2c33', '#3c3f47'),
         q(0.41, 0.41, 1.0, 0.18, 0.18, 0.45, '#2a2c33', '#3c3f47'),
+        q(0.08, 0.62, 0, 0.14, 0.14, 0.28, '#30323a', '#43464f'), // kleiner Bruder vorn links
+        // nasser Glanz vorn: feine helle Streifen, wo Tropfen herablaufen
+        q(0.3, 0.78, 0.08, 0.03, PLATE, 0.34, '#4a4e5a'),
+        q(0.4, 0.68, 0.56, 0.03, PLATE, 0.36, '#4a4e5a'),
+        q(0.46, 0.59, 1.06, 0.03, PLATE, 0.3, '#555a66'),
       ];
     case 'cloudpuff':
       return [
-        // niedriger Bausch vorn links, höherer hinten rechts; ohne Überlappung zerlegt (wie die Hecke)
+        // niedriger Bausch vorn links, höherer hinten rechts; ohne Überlappung zerlegt (wie die Hecke); obenauf ein Puff
         q(0.15, 0.3, 0, 0.25, 0.4, 0.25, '#e6eef7', '#ffffff'),
         q(0.4, 0.6, 0, 0.25, 0.1, 0.25, '#e6eef7', '#ffffff'),
         q(0.4, 0.15, 0, 0.4, 0.45, 0.35, '#e6eef7', '#ffffff'),
+        q(0.5, 0.25, 0.35, 0.2, 0.25, 0.1, '#eef4fa', '#ffffff'),
       ];
     default:
       return null;
@@ -268,12 +189,25 @@ function themedBoxes(c: Cell, x: number, y: number, h: number, q: Q): Box[] | nu
 
 /** Kleine Dinge der Wiese und der Welten: je Deko-Art ihre Quader (null: keins davon) */
 function smallBoxes(c: Cell, x: number, y: number, h: number): Box[] | null {
-  const q: Q = (bx, by, bz, w, d, hh, side, top = side) => [x + bx, y + by, h + bz, w, d, hh, side, top];
+  const q: Q = (bx, by, bz, w, d, hh, side, top = side, fine?) => [
+    x + bx,
+    y + by,
+    h + bz,
+    w,
+    d,
+    hh,
+    side,
+    top,
+    undefined,
+    fine,
+  ];
   switch (c.deco) {
     case 'flower':
       return [
         q(0.47, 0.47, 0, 0.06, 0.06, 0.18, '#3f9a3c'),
-        q(0.4, 0.4, 0.18, 0.2, 0.2, 0.1, c.color ?? '#ffffff', '#f2d14b'),
+        q(0.4, 0.4, 0.18, 0.2, 0.2, 0.1, c.color ?? '#ffffff', '#f2d14b', BLATT), // Blüte, Blütenblätter gemustert
+        q(0.53, 0.47, 0.05, 0.08, 0.04, 0.03, '#58a73a'), // Blatt am Stiel
+        q(0.46, 0.46, 0.28, 0.08, 0.08, 0.02, mix('#f2d14b', '#e8823a', 0.3)), // Mitte (Entwurf)
       ];
     case 'fern':
       return [
@@ -284,22 +218,32 @@ function smallBoxes(c: Cell, x: number, y: number, h: number): Box[] | null {
             [0.62, 0.52, 0.3],
             [0.42, 0.6, 0.28],
           ] as const
-        ).map(([fx, fy, fh]) => q(fx - 0.05, fy, 0.04, 0.1, 0.08, fh - 0.04, '#3c8a34', '#58a73a')),
-        q(0.28, 0.42, 0, 0.44, 0.14, 0.04, '#4f9a3c', '#6dbd47'), // Blätter am Boden, die Wedel stehen darauf
+        ).flatMap(([fx, fy, fh]) => [
+          q(fx - 0.05, fy, 0.04, 0.1, 0.08, fh - 0.04, '#3c8a34', '#58a73a', BLATT),
+          q(fx - 0.03, fy + 0.02, fh, 0.06, 0.04, 0.03, '#6dbd47'), // eingerollte Spitze
+        ]),
+        q(0.25, 0.36, 0, 0.47, 0.32, 0.04, '#4f9a3c', '#6dbd47', BLATT), // Blätter am Boden, alle Wedel stehen darauf
       ];
     case 'boulder':
       return [
         q(0.14, 0.2, 0, 0.72, 0.6, 0.42, '#878c93', '#9aa0a7'),
         q(0.26, 0.28, 0.42, 0.46, 0.38, 0.16, '#8f949b', '#a8adb3'),
-        q(0.3, 0.3, 0.58, 0.3, 0.2, 0.03, '#5f9a3c', '#6dbd47'), // Moos
+        q(0.3, 0.3, 0.58, 0.3, 0.2, 0.03, '#5f9a3c', '#6dbd47', MOOS), // Moos
+        q(0.18, 0.24, 0.42, 0.08, 0.14, 0.02, '#5f9a3c', '#6dbd47'), // Moos am Rand
+        q(0.42, 0.8, 0.12, 0.02, PLATE, 0.22, '#6c7178'), // Riss vorn
+        q(0.02, 0.66, 0, 0.12, 0.1, 0.07, '#7d838b', '#9aa0a7'), // Kiesel davor, links am Fels
+        q(0.78, 0.8, 0, 0.09, 0.08, 0.05, '#8f949b', '#a8adb3'),
       ];
     case 'mushroom':
       return mushroomBoxes(x, y, h);
     case 'reed':
       return [
         q(0.3, 0.5, 0, 0.06, 0.06, 0.55, '#5f8f3a'),
+        q(0.29, 0.49, 0.55, 0.08, 0.08, 0.13, '#7a5432', '#8a6440', MOOS), // Kolben
         q(0.6, 0.3, 0, 0.06, 0.06, 0.66, '#5f8f3a'),
-        q(0.59, 0.29, 0.66, 0.08, 0.08, 0.16, '#7a5432'),
+        q(0.59, 0.29, 0.66, 0.08, 0.08, 0.16, '#7a5432', '#8a6440', MOOS),
+        q(0.45, 0.42, 0, 0.04, 0.04, 0.42, '#6f9f44'), // Halm dazwischen
+        q(0.18, 0.62, 0, 0.04, 0.04, 0.3, '#6f9f44'),
       ];
     case 'lily':
       return lilyBoxes(x, y);
@@ -312,9 +256,10 @@ function smallBoxes(c: Cell, x: number, y: number, h: number): Box[] | null {
 function bigshroomBoxes(c: Cell, x: number, y: number, h: number): Box[] {
   const cap = c.color ?? '#d9473a';
   return [
-    [x + 0.36, y + 0.36, h, 0.28, 0.28, 1.4, '#efe4d2', '#f7efe2'],
-    [x - 0.25, y - 0.25, h + 1.4, 1.5, 1.5, 0.45, cap, cap, 'see'],
-    [x + 0.05, y + 0.05, h + 1.85, 0.9, 0.9, 0.25, cap, cap, 'see'],
+    [x + 0.36, y + 0.36, h, 0.28, 0.28, 1.4, '#efe4d2', '#f7efe2', undefined, FASER],
+    ...collar([x + 0.31, y + 0.31, h + 0.95, 0.38, 0.38, 0.06, '#f7efe2', '#fbf6ee'], 0.05), // Ring um den Stiel
+    [x - 0.25, y - 0.25, h + 1.4, 1.5, 1.5, 0.45, cap, cap, 'see', LACK],
+    [x + 0.05, y + 0.05, h + 1.85, 0.9, 0.9, 0.25, cap, cap, 'see', LACK],
     // Tupfen oben auf dem oberen Hut und rundum auf dem Rand des unteren (nie halb in einem Hut, nie in der Luft)
     ...(
       [

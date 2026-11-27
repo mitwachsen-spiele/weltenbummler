@@ -73,6 +73,7 @@ import { Views3D, type Air } from './mitwachsen-view-3d';
 import { DUSK_SKY, nightMix, sunLevel, type Rgb } from './mitwachsen-dusk';
 import { tufts } from './mitwachsen-trees-3d';
 import { decoBoxes } from './mitwachsen-deco-look';
+import { SIGN_TOP, WOOD_BED, bedBoxes, signBoxes, sleeperBoxes } from './mitwachsen-yard-look';
 import { stoneOf } from './mitwachsen-waystone';
 import { waystoneBoxes } from './mitwachsen-waystone-look';
 import type { PlateTurn } from './mitwachsen-turn-3d';
@@ -133,7 +134,6 @@ const GROUND_TILES: Record<Exclude<Cell['ground'], 'water' | 'lava' | 'sky'>, [T
 /** Kacheln der Hecke am Rand der Lichtung (`Cell.rim`) */
 const HEDGE_TILES: [Tile, Tile, Tile] = ['leaves', 'leaves', 'leaves'];
 /** Rahmen des Betts: aus Holz (Seite, oben, Kachel); in einer Welt hinter einem Tor sagt es ihr Paket */
-const WOOD_FRAME: readonly [string, string | null, Tile] = [GAME_COLORS.bed.frame, null, 'planks'];
 const SKY = new Color('#9fd6f0');
 const NIGHT_SKY = new Color('#141a3a');
 const CLOUD_SKY = new Color('#a9b4bf'); // Himmel bei Wolken und Regen
@@ -741,21 +741,15 @@ export class World3D {
   private decoration(g: Geo, blades: Geo, bright: Geo, fine: FineSinks, c: Cell, x: number, y: number) {
     const h = c.h;
     if (c.tufts) tufts(blades, x, y, h, c.tufts);
-    const f = fine.solid;
     switch (c.deco) {
       case 'klangstein':
         return stoneInto(g, x, y, h);
-      case 'bed': {
-        const [side, top, tile] = this.views.bedFrame(c, WOOD_FRAME);
-        f.box(x + 0.06, h, y + 0.05, 0.88, 0.28, 0.9, side, top, tile, undefined, {});
-        f.box(x + 0.1, h + 0.28, y + 0.08, 0.8, 0.12, 0.26, GAME_COLORS.bed.pillow, null, 'white', undefined, {});
-        f.box(x + 0.08, h + 0.28, y + 0.34, 0.84, 0.1, 0.6, GAME_COLORS.bed.blanket, null, 'white', undefined, {});
-        return;
+      case 'bed':
+        return fineBoxes(fine, bedBoxes(x, y, h, this.views.bedFrame(c, WOOD_BED)));
+      case 'sign': {
+        const region = REGIONS.find((r) => r.id === GATES.find((g) => g.id === c.sign)?.region);
+        return fineBoxes(fine, signBoxes(x, y, h, region?.animals.length ?? 0));
       }
-      case 'sign':
-        f.box(x + 0.44, h, y + 0.44, 0.12, 0.6, 0.12, GAME_COLORS.fenceDark, null, 'white', undefined, {});
-        f.box(x - 0.1, h + 0.6, y + 0.4, 1.2, 0.5, 0.18, GAME_COLORS.board, '#d4a874', 'planks', undefined, {});
-        return;
     }
     const world = this.world!;
     const boxes = decoBoxes(world, c, x, y, this.at.picked, () => homeAt(world, x, y).shelter);
@@ -863,13 +857,14 @@ export class World3D {
       const sign = g.sign;
       const region = REGIONS.find((r) => r.id === g.region)!;
       const n = region.animals.length;
+      const top = (this.world?.cell(sign[0], sign[1]).h ?? 1) + SIGN_TOP; // auf dem Rahmen der Tafel
       region.animals.forEach((a, i) => {
         const met = state.met.includes(`${region.id}:${a.species}`);
         const sp = SPECIES[a.species];
         const m = new Mesh(this.model(a.species, sp.parts, sp.scale).geo, met ? this.entity : this.dark);
         m.scale.setScalar(sp.scale * 0.45);
         m.rotation.y = facing;
-        m.position.set(sign[0] + 0.5 + (i - (n - 1) / 2) * 0.42, 2.1, sign[1] + 0.5);
+        m.position.set(sign[0] + 0.5 + (i - (n - 1) / 2) * 0.55, top, sign[1] + 0.5);
         this.signs.add(m);
       });
     }
@@ -885,11 +880,7 @@ export class World3D {
       }
       this.sleeperAt = `${x},${y}`;
       const g = new Geo();
-      const box = (bx: number, by: number, bz: number, w: number, h: number, d: number, color: string) =>
-        g.box(bx, by, bz, w, h, d, color, null, 'white', undefined, {});
-      box(x + 0.32, 1.38, y + 0.1, 0.36, 0.3, 0.24, this.look.skin);
-      box(x + 0.31, 1.62, y + 0.09, 0.38, 0.1, 0.26, this.look.hair);
-      box(x + 0.1, 1.38, y + 0.36, 0.8, 0.14, 0.56, GAME_COLORS.bed.blanket);
+      for (const b of sleeperBoxes(x, y, this.world!.cell(x, y).h, this.look)) fineBox(g, b);
       this.sleeper.add(new Mesh(g.build(), this.entity));
     }
     this.sleeper.visible = state.sleeping;

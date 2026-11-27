@@ -4,6 +4,7 @@ import type { Cell, Deco } from './mitwachsen-cell';
 import { decoBoxes, shelterBoxes, type Neighbours } from './mitwachsen-deco-look';
 import { ROW_FRONT, before, clampRow, rowCache, sortBoxes } from './mitwachsen-row';
 import { TREE_HULL, treeBoxes } from './mitwachsen-tree-look';
+import { WOOD_BED, bedBoxes, bridgeBoxes, fenceBoxes, signBoxes, sleeperBoxes } from './mitwachsen-yard-look';
 import type { Box } from './mitwachsen-view';
 
 const around = (map: Record<string, Deco>): Neighbours => ({ cell: (x, y) => ({ deco: map[`${x},${y}`] ?? null }) });
@@ -45,6 +46,20 @@ const all = (): [string, readonly Box[], number][] => [
     [`${k} 8,2`, treeBoxes(k, 8, 2, 2), 2],
   ]),
   ...OWN.flatMap((d) => NEIGHBOURS.map((n, i): [string, readonly Box[], number] => [`${d} ${i}`, at(d, around(n)), 5])),
+  // Dinge an Haus und Garten, die die Ansichten mit Zustand bestellen (mitwachsen-yard-look.ts)
+  ['Bett', bedBoxes(3, 5, 1, WOOD_BED), 5],
+  [
+    'Bett mit Schläfer',
+    [...bedBoxes(3, 5, 1, WOOD_BED), ...sleeperBoxes(3, 5, 1, { skin: '#f2c9a0', hair: '#6b4226' })],
+    5,
+  ],
+  ['Schneebett', bedBoxes(3, 5, 2, ['#d5e4f0', '#f6f9fc', 'schnee']), 5],
+  ...[1, 3, 5].map((n): [string, readonly Box[], number] => [`Tafel ${n}`, signBoxes(3, 5, 1, n), 5]),
+  ['Brücke', bridgeBoxes(3, 5, 0.6), 5],
+  ...[1, 0.4].flatMap((t): [string, readonly Box[], number][] => [
+    [`Gartentor quer ${t}`, fenceBoxes(around({ '3,5': 'gate', '2,5': 'fence', '4,5': 'fence' }), 3, 5, 1, t), 5],
+    [`Gartentor längs ${t}`, fenceBoxes(around({ '3,5': 'gate', '3,4': 'fence', '3,6': 'fence' }), 3, 5, 1, t), 5],
+  ]),
 ];
 
 /**

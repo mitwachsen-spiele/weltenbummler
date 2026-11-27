@@ -48,7 +48,7 @@ const DEEP: Ground = { tiles: ['ice', 'ice', 'ice'], top: DEEP_ICE.top, side: DE
 /** Die Runde der Schneeraupe: gewalzter Schnee, eine Spur dunkler als der Schnee ringsum */
 const PISTE: Ground = { tiles: ['snowTop', 'ice', 'ice'], top: CAT_COLORS.piste[0] };
 /** Rahmen des Betts aus Schnee */
-const SNOW_FRAME: Frame = [...ICE_COLORS.snow, 'white'];
+const SNOW_FRAME: Frame = [...ICE_COLORS.snow, 'schnee'];
 
 /** Iglu, Eisschale, Eistrog: Quader wie in 2D */
 const look: DrawDeco = (world, c, x, y) => iceBoxes(world, c, x, y);

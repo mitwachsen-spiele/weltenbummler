@@ -11,6 +11,7 @@ import type { GateId, RegionId } from '../../data/games/mitwachsen';
 import type { Cell } from './mitwachsen-cell';
 import type { GateLook } from './mitwachsen-gate-kit';
 import type { Tile } from './mitwachsen-geo';
+import type { BedFrame } from './mitwachsen-yard-look';
 import type { Box, DecoAt, DrawRails, View2D } from './mitwachsen-view';
 import type { WorldPack } from './mitwachsen-pack-types';
 import type { Scene } from './mitwachsen-render';
@@ -34,8 +35,8 @@ export type Ground = { tiles: readonly [Tile, Tile, Tile]; top?: string; side?: 
  */
 export type Air = { realm: RegionId; sky: string; mist: string };
 
-/** Rahmen des Betts: Farbe der Seiten, oben (null: wie die Seiten), Kachel */
-export type Frame = readonly [string, string | null, Tile];
+/** Rahmen des Betts: Farbe der Seiten, oben (null: wie die Seiten), Muster (mitwachsen-yard-look.ts) */
+export type Frame = BedFrame;
 
 /**
  * Was ein 3D-Teil je Bild nachführt (Eis-Welt: Fußspuren im Schnee, Schneespur des Schlittens): ein Objekt in der Szene
