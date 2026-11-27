@@ -65,12 +65,13 @@ import type { Scene } from './mitwachsen-render';
 import { SHEER } from './mitwachsen-ride-view';
 import type { State } from './mitwachsen-state';
 import type { Cell, World } from './mitwachsen-world';
-import { PILZ_OVER, homeAt, openRoof } from './mitwachsen-home';
+import { homeAt, openRoof } from './mitwachsen-home';
 import { turnHead } from './mitwachsen-air';
 import { drawDeco, type DecoAt } from './mitwachsen-view';
 import { Views3D, type Air } from './mitwachsen-view-3d';
 import { DUSK_SKY, nightMix, sunLevel, type Rgb } from './mitwachsen-dusk';
-import { tree, tufts } from './mitwachsen-trees-3d';
+import { tufts } from './mitwachsen-trees-3d';
+import { decoBoxes } from './mitwachsen-deco-look';
 import { stoneOf } from './mitwachsen-waystone';
 import { waystoneBoxes } from './mitwachsen-waystone-look';
 import type { PlateTurn } from './mitwachsen-turn-3d';
@@ -78,17 +79,6 @@ import { CAM_REST, camPose } from './mitwachsen-camera';
 import { hangAt } from './mitwachsen-roost';
 import { workOf } from './mitwachsen-herald';
 
-/** Beeren am Busch: [x, Höhe, z] im Feld; oben auf der Kuppe und an der Vorderseite (zur Kamera) */
-const BERRIES = [
-  [0.3, 0.66, 0.34],
-  [0.56, 0.66, 0.5],
-  [0.42, 0.66, 0.62],
-  [0.2, 0.3, 0.85],
-  [0.5, 0.18, 0.85],
-  [0.72, 0.34, 0.85],
-  [0.05, 0.22, 0.5],
-  [0.88, 0.26, 0.4],
-] as const;
 const SUN_OFFSET = new Vector3(-9, 22, 7); // Sonne von links oben vorn, vom Ziel aus (dreht mit der Kamera)
 const UP = new Vector3(0, 1, 0);
 const NEAR_GATE = 14; // so nah (Felder, waagrecht und senkrecht) an einem Tor lädt die Drehung zur Torfront nach
@@ -674,10 +664,6 @@ export class World3D {
         'white',
         new Color(this.views.water(c) ?? GAME_COLORS.water),
       );
-      if (c.deco === 'lily') {
-        g.box(x + 0.25, 0.83, y + 0.3, 0.5, 0.03, 0.4, '#4f9a3c', '#6dbd47');
-        g.box(x + 0.45, 0.86, y + 0.42, 0.12, 0.06, 0.12, '#e77fb3');
-      }
       return;
     }
     const h = c.h;
@@ -735,189 +721,31 @@ export class World3D {
     return !!boxes;
   }
 
+  /**
+   * Dinge auf einem Feld aus derselben Quelle wie 2D (mitwachsen-deco-look.ts): Laub (`see`) vor der Figur durchsichtig,
+   * Kristalle leuchten aus sich selbst; Bett, Tafel und Klangstein baut die 3D-Ansicht selbst
+   */
   private decoration(g: Geo, blades: Geo, canopy: Geo, bright: Geo, c: Cell, x: number, y: number) {
     const h = c.h;
     if (c.tufts) tufts(blades, x, y, h, c.tufts);
     switch (c.deco) {
-      case 'tree':
-        tree(g, canopy, x, y, h, c.tree ?? 'oak');
-        break;
-      case 'bush':
-        // Beerenbusch: niedrig und rund (zwei Stufen), rote Beeren oben und vorn – kein Baumwipfel
-        canopy.box(x + 0.08, h, y + 0.12, 0.84, 0.5, 0.76, '#3f9a3c', '#5ab651', 'leaves');
-        canopy.box(x + 0.2, h + 0.5, y + 0.22, 0.6, 0.16, 0.56, '#3f9a3c', '#5ab651', 'leaves');
-        if (!(`${x},${y}` in this.at.picked))
-          for (const [bx, by, bz] of BERRIES) g.box(x + bx, h + by, y + bz, 0.09, 0.09, 0.09, '#c8323a', '#ef5b5b');
-        break;
-      case 'flower':
-        g.box(x + 0.47, h, y + 0.47, 0.06, 0.18, 0.06, '#3f9a3c');
-        g.box(x + 0.4, h + 0.18, y + 0.4, 0.2, 0.1, 0.2, c.color ?? '#ffffff', '#f2d14b');
-        break;
-      case 'fern':
-        for (const [fx, fz, fh] of [
-          [0.3, 0.45, 0.34],
-          [0.5, 0.36, 0.42],
-          [0.62, 0.52, 0.3],
-          [0.42, 0.6, 0.28],
-        ] as const)
-          g.box(x + fx - 0.05, h, y + fz, 0.1, fh, 0.08, '#3c8a34', '#58a73a');
-        break;
-      case 'boulder':
-        g.box(x + 0.14, h, y + 0.2, 0.72, 0.42, 0.6, '#8a8f96', '#9aa0a7', 'stone');
-        g.box(x + 0.26, h + 0.42, y + 0.28, 0.46, 0.16, 0.38, '#8f949b', '#6dbd47', 'stone');
-        break;
-      case 'mushroom':
-        g.box(x + 0.44, h, y + 0.46, 0.1, 0.16, 0.1, '#f3efe6');
-        g.box(x + 0.33, h + 0.16, y + 0.35, 0.32, 0.12, 0.32, '#d9473a', '#e0574a');
-        break;
-      case 'reed':
-        g.box(x + 0.3, h, y + 0.5, 0.06, 0.55, 0.06, '#5f8f3a');
-        g.box(x + 0.6, h, y + 0.3, 0.06, 0.66, 0.06, '#5f8f3a');
-        g.box(x + 0.59, h + 0.66, y + 0.29, 0.08, 0.16, 0.08, '#7a5432');
-        break;
-      case 'fence':
-        this.fence(g, x, y, h);
-        break;
-      case 'cactus':
-        g.box(x + 0.37, h, y + 0.37, 0.26, 1.35, 0.26, '#3f8f3a', '#5aab4a');
-        g.box(x + 0.13, h + 0.55, y + 0.42, 0.24, 0.16, 0.16, '#3f8f3a', '#5aab4a');
-        g.box(x + 0.13, h + 0.55, y + 0.42, 0.14, 0.55, 0.16, '#3f8f3a', '#5aab4a');
-        g.box(x + 0.63, h + 0.8, y + 0.42, 0.24, 0.16, 0.16, '#3f8f3a', '#5aab4a');
-        g.box(x + 0.73, h + 0.8, y + 0.42, 0.14, 0.45, 0.16, '#3f8f3a', '#5aab4a');
-        g.box(x + 0.44, h + 1.35, y + 0.44, 0.12, 0.1, 0.12, '#f08cc8'); // Blüte
-        break;
-      case 'crystal': {
-        const cc = c.color ?? '#b48cf0';
-        bright.box(x + 0.36, h, y + 0.36, 0.28, 1.15, 0.28, cc);
-        bright.box(x + 0.14, h, y + 0.5, 0.2, 0.7, 0.2, cc);
-        bright.box(x + 0.62, h, y + 0.22, 0.18, 0.55, 0.18, cc);
-        break;
-      }
-      case 'stalagmite':
-        g.box(x + 0.22, h, y + 0.22, 0.56, 0.5, 0.56, '#ffffff', null, 'cave');
-        g.box(x + 0.32, h + 0.5, y + 0.32, 0.36, 0.5, 0.36, '#ffffff', null, 'cave');
-        g.box(x + 0.41, h + 1.0, y + 0.41, 0.18, 0.45, 0.18, '#ffffff', null, 'cave');
-        break;
-      case 'bigshroom': {
-        const cap = c.color ?? '#d9473a';
-        g.box(x + 0.36, h, y + 0.36, 0.28, 1.4, 0.28, '#efe4d2', '#f7efe2');
-        canopy.box(x - 0.25, h + 1.4, y - 0.25, 1.5, 0.45, 1.5, cap, cap);
-        canopy.box(x + 0.05, h + 1.85, y + 0.05, 0.9, 0.25, 0.9, cap, cap);
-        for (const [dx, dz] of [
-          [0.1, 0.2],
-          [0.75, 0.55],
-          [0.3, 0.85],
-          [0.95, 0.05],
-        ] as const)
-          canopy.box(x + dx - 0.15, h + 1.86, y + dz - 0.15, 0.2, 0.05, 0.2, '#ffffff');
-        break;
-      }
-      case 'trough':
-      case 'watertrough': {
-        // Trog aus Holz auf vier Füßchen: Futter (Heu und Möhren) oder Wasser
-        for (const [fx, fz] of [
-          [0.1, 0.2],
-          [0.8, 0.2],
-          [0.1, 0.72],
-          [0.8, 0.72],
-        ] as const)
-          g.box(x + fx, h, y + fz, 0.1, 0.12, 0.1, '#7a5432');
-        g.box(x + 0.05, h + 0.12, y + 0.15, 0.9, 0.08, 0.72, '#8a5a30', '#a0703f', 'planks');
-        g.box(x + 0.05, h + 0.2, y + 0.15, 0.9, 0.28, 0.08, '#8a5a30', '#a0703f', 'planks');
-        g.box(x + 0.05, h + 0.2, y + 0.79, 0.9, 0.28, 0.08, '#8a5a30', '#a0703f', 'planks');
-        g.box(x + 0.05, h + 0.2, y + 0.23, 0.08, 0.28, 0.56, '#8a5a30', '#a0703f', 'planks');
-        g.box(x + 0.87, h + 0.2, y + 0.23, 0.08, 0.28, 0.56, '#8a5a30', '#a0703f', 'planks');
-        if (c.deco === 'watertrough') g.box(x + 0.13, h + 0.2, y + 0.23, 0.74, 0.22, 0.56, '#3f8fd8', '#7fc0f0');
-        else {
-          g.box(x + 0.13, h + 0.2, y + 0.23, 0.74, 0.26, 0.56, '#d9b85a', '#ecd27a'); // Heu
-          for (const [fx, fz] of [
-            [0.25, 0.35],
-            [0.55, 0.5],
-            [0.7, 0.3],
-          ] as const)
-            g.box(x + fx, h + 0.46, y + fz, 0.14, 0.06, 0.06, '#f08a3c'); // Möhren
-        }
-        break;
-      }
-      case 'shelterpilz':
-        this.shelterPilz(g, canopy, x, y, h);
-        break;
       case 'klangstein':
-        stoneInto(g, x, y, h);
-        break;
-      case 'cloudpuff':
-        g.box(x + 0.15, h, y + 0.3, 0.5, 0.25, 0.4, '#ffffff', null, 'cloud');
-        g.box(x + 0.4, h, y + 0.15, 0.4, 0.35, 0.45, '#ffffff', null, 'cloud');
-        break;
-      case 'hedge':
-        canopy.box(x + 0.08, h, y + 0.08, 0.84, 0.75, 0.84, '#3a8a35', '#4fa84a', 'leaves');
-        break;
-      case 'arch':
-        g.box(x + 0.02, h, y + 0.38, 0.16, 1.3, 0.2, GAME_COLORS.fenceDark, GAME_COLORS.fence);
-        g.box(x + 0.82, h, y + 0.38, 0.16, 1.3, 0.2, GAME_COLORS.fenceDark, GAME_COLORS.fence);
-        g.box(x, h + 1.3, y + 0.34, 1, 0.2, 0.28, '#3a8a35', '#4fa84a', 'leaves');
-        for (let i = 0; i < 4; i++)
-          g.box(x + 0.12 + i * 0.22, h + 1.5, y + 0.43, 0.1, 0.07, 0.1, i % 2 ? '#e77fb3' : '#ffffff');
-        break;
+        return stoneInto(g, x, y, h);
       case 'bed':
         g.box(x + 0.06, h, y + 0.05, 0.88, 0.28, 0.9, ...this.views.bedFrame(c, WOOD_FRAME));
         g.box(x + 0.1, h + 0.28, y + 0.08, 0.8, 0.12, 0.26, GAME_COLORS.bed.pillow);
         g.box(x + 0.08, h + 0.28, y + 0.34, 0.84, 0.1, 0.6, GAME_COLORS.bed.blanket);
-        break;
+        return;
       case 'sign':
         g.box(x + 0.44, h, y + 0.44, 0.12, 0.6, 0.12, GAME_COLORS.fenceDark);
         g.box(x - 0.1, h + 0.6, y + 0.4, 1.2, 0.5, 0.18, GAME_COLORS.board, '#d4a874', 'planks');
-        break;
+        return;
     }
-  }
-
-  /**
-   * Riesenpilz auf der Wiese als Unterstand: dicker cremefarbener Stiel mit Kragen in der Mitte, darüber ein
-   * hoher, breiter roter Hut mit weißen Tupfen (Laub-Material: vor der Figur wird er durchsichtig). Der Hut sitzt so
-   * hoch, dass man die Tiere in den vorderen Reihen darunter sieht.
-   */
-  private shelterPilz(g: Geo, canopy: Geo, x: number, y: number, h: number) {
-    const { x0, y0, x1, y1 } = homeAt(this.world!, x, y).shelter; // Unterstand der Gegend dieses Stiels
-    const stem = '#efe4d2',
-      stemTop = '#f7efe2',
-      red = '#d9473a',
-      redTop = '#e0574a';
-    g.box(x + 0.15, h, y + 0.15, 0.7, 3.2, 0.7, stem, stemTop);
-    g.box(x - 0.05, h + 2.2, y - 0.05, 1.1, 0.25, 1.1, stem, stemTop); // Kragen
-    const [cx0, cx1] = [x0 - PILZ_OVER, x1 + 1 + PILZ_OVER], // der Hut ragt nur wenig über (vorher 0,6 und 0,8)
-      [cz0, cz1] = [y0 - PILZ_OVER, y1 + 1 + PILZ_OVER];
-    canopy.box(cx0, h + 3.2, cz0, cx1 - cx0, 0.45, cz1 - cz0, red, redTop); // Hutrand
-    canopy.box(cx0 + 0.9, h + 3.65, cz0 + 0.7, cx1 - cx0 - 1.8, 0.45, cz1 - cz0 - 1.4, red, redTop);
-    canopy.box(cx0 + 2.0, h + 4.1, cz0 + 1.3, cx1 - cx0 - 4.0, 0.35, cz1 - cz0 - 2.6, red, redTop); // Kuppe
-    canopy.box(cx0 + 0.05, h + 3.15, cz0 + 0.05, cx1 - cx0 - 0.1, 0.06, cz1 - cz0 - 0.1, '#f3e6c8'); // Lamellen unten
-    // weiße Tupfen auf den Stufen des Huts und vorn am Rand
-    for (const [dx, dz, step] of [
-      [0.2, 0.2, 0],
-      [6.7, 0.25, 0],
-      [0.25, 2.7, 0],
-      [6.6, 2.65, 0],
-      [1.4, 0.9, 1],
-      [5.0, 1.0, 1],
-      [2.0, 1.9, 1],
-      [4.4, 2.0, 1],
-      [3.4, 1.5, 2],
-    ] as const)
-      canopy.box(cx0 + dx, h + 3.65 + step * 0.45, cz0 + dz, 0.5, 0.06, 0.5, '#ffffff');
-    for (const dx of [0.6, 2.4, 4.4, 6.2]) canopy.box(cx0 + dx, h + 3.3, cz1 - 0.02, 0.5, 0.3, 0.04, '#ffffff');
-  }
-
-  private fence(g: Geo, x: number, y: number, h: number) {
-    const w = this.world!;
-    const joins = (dx: number, dy: number) => {
-      const d = w.cell(x + dx, y + dy).deco;
-      return d === 'fence' || d === 'gate';
-    };
-    const [c, top] = [GAME_COLORS.fence, GAME_COLORS.fenceDark];
-    g.box(x + 0.4, h, y + 0.4, 0.2, 0.8, 0.2, c, top, 'planks');
-    if (joins(0, -1)) g.box(x + 0.45, h + 0.3, y, 0.1, 0.12, 0.5, c, top, 'planks');
-    if (joins(0, 1)) g.box(x + 0.45, h + 0.3, y + 0.5, 0.1, 0.12, 0.5, c, top, 'planks');
-    if (joins(-1, 0)) g.box(x, h + 0.3, y + 0.45, 0.5, 0.12, 0.1, c, top, 'planks');
-    if (joins(1, 0)) g.box(x + 0.5, h + 0.3, y + 0.45, 0.5, 0.12, 0.1, c, top, 'planks');
+    const world = this.world!;
+    const boxes = decoBoxes(world, c, x, y, this.at.picked, () => homeAt(world, x, y).shelter);
+    const solid = c.deco === 'crystal' ? bright : g;
+    for (const [bx, by, bz, w, d, bh, side, top, kind] of boxes ?? [])
+      (kind === 'see' ? canopy : solid).box(bx, bz, by, w, bh, d, side, top);
   }
 
   // ---------- Bewegliches: Wesen, Tore, Tafeln, Schläfer ----------

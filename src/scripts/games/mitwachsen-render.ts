@@ -42,14 +42,16 @@ import {
 import { carried } from './mitwachsen-carry';
 import { grown } from './mitwachsen-growth';
 import { drawBox, drawDeco, placeRails, type Box, type DecoAt, type View2D } from './mitwachsen-view';
+import { decoBoxes, fenceBoxes } from './mitwachsen-deco-look';
+import { clampRow, rowCache, sortBoxes } from './mitwachsen-row';
 import { drawStone, heardStone } from './mitwachsen-story';
 import type { WeatherLook } from './mitwachsen-weather';
 import type { Pose } from './mitwachsen-tired';
 import type { Climate } from './mitwachsen-world';
 import type { State } from './mitwachsen-state';
 import { cycle, hash } from '../../lib/games/rng';
-import type { Cell, TreeKind, World } from './mitwachsen-world';
-import { PILZ_OVER, ROOF_LEFT, homeAt, openRoof } from './mitwachsen-home';
+import type { Cell, Deco, World } from './mitwachsen-world';
+import { ROOF_LEFT, homeAt, openRoof } from './mitwachsen-home';
 import { drawPlate, drawPlatform } from './mitwachsen-platform-2d';
 import { stoneOf } from './mitwachsen-waystone';
 import { waystoneBoxes } from './mitwachsen-waystone-look';
@@ -113,6 +115,12 @@ export type Scene = {
 
 /** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee: `BED_SNOW`) */
 const BED_FRAME: readonly [string, string] = [GAME_COLORS.bed.frame, GAME_COLORS.bed.frame];
+/** Schatten unter Dingen in 2D: Mitte (Felder nach vorn) und Radius */
+const SHADOW: Partial<Record<Deco, readonly [number, number]>> = {
+  tree: [0.6, 0.7],
+  bush: [0.55, 0.42],
+  boulder: [0.55, 0.4],
+};
 
 /**
  * Die Figur, mit Korb auf dem Rücken, Eimer (in der Grotte Kanne) und Netz in den Händen, solange sie Beeren oder Pilze,
@@ -138,6 +146,7 @@ export class Renderer {
   private at: DecoAt = { now: 0, reduced: false, picked: {}, packs: {} };
   private album = new Album(); // Leiste unten
   private roof = 1; // Deckkraft der Dächer am Zuhause in diesem Bild (`openRoof`)
+  private things = rowCache(); // Quader der Dinge je Feld, geklemmt und sortiert (nicht jedes Bild neu)
   private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Torplatte; nachgeladen)
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'ring' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
 
@@ -502,91 +511,6 @@ export class Renderer {
     }
   }
 
-  /** Blätterklumpen mit Sprenkeln in hell und dunkel, damit er nicht flach wirkt */
-  private leafy(
-    P: Projection,
-    x0: number,
-    y0: number,
-    z0: number,
-    w: number,
-    d: number,
-    hgt: number,
-    color: string,
-    top: string,
-    sx: number,
-    sy: number,
-  ) {
-    const { ctx } = this;
-    box(ctx, P, x0, y0, z0, w, d, hgt, color, top);
-    for (let i = 0; i < 16; i++) {
-      const r = hash(11, sx, sy, i);
-      const fx = x0 + ((r % 85) / 100) * w,
-        fz = z0 + (((r >>> 8) % 80) / 100) * hgt;
-      const [px, py] = P(fx, y0 + d, fz);
-      const s = Math.max(2, P(fx + 0.07, y0, 0)[0] - P(fx, y0, 0)[0]);
-      ctx.fillStyle = i % 3 === 0 ? 'rgba(255,255,255,.28)' : 'rgba(0,40,0,.32)';
-      ctx.fillRect(px, py - s, s, s);
-      const [qx, qy] = P(x0 + (((r >>> 16) % 85) / 100) * w, y0 + (((r >>> 4) % 80) / 100) * d, z0 + hgt);
-      ctx.fillStyle = i % 2 ? 'rgba(255,255,255,.2)' : 'rgba(0,40,0,.18)';
-      ctx.fillRect(qx, qy, s, s * 0.7);
-    }
-  }
-
-  /** Baum mit großer, runder Krone aus mehreren Klumpen; vier Arten mit eigenen Farben */
-  private tree(P: Projection, x: number, y: number, h: number, kind: TreeKind) {
-    const { ctx } = this;
-    const leaves: Record<TreeKind, [string, string]> = {
-      oak: ['#3f9a3c', '#5ab651'],
-      birch: ['#6aab3a', '#8fcf5a'],
-      autumn: ['#d9732e', '#f0a04a'],
-      red: ['#b8452e', '#d9603a'],
-      blossom: ['#e595bd', '#f6c3dc'],
-      winter: ['#cfdbe2', '#ffffff'],
-      pine: ['#2f6f3a', '#3f8a48'],
-      snowpine: ['#2f6f3a', '#ffffff'],
-      palm: ['#3f9a3c', '#5ab651'],
-      dead: ['#4a3426', '#5d3e21'],
-    };
-    const [leaf, top] = leaves[kind];
-    this.shadow(P, x + 0.5, y + 0.6, h, 0.7);
-    if (kind === 'pine' || kind === 'snowpine') {
-      box(ctx, P, x + 0.4, y + 0.42, h, 0.2, 0.2, 0.7, '#7a5432', '#93683f');
-      box(ctx, P, x - 0.25, y - 0.1, h + 0.5, 1.5, 1.2, 0.6, leaf, top);
-      box(ctx, P, x, y + 0.1, h + 1.2, 1.0, 0.8, 0.6, leaf, top);
-      box(ctx, P, x + 0.2, y + 0.25, h + 1.8, 0.6, 0.5, 0.6, leaf, top);
-      return;
-    }
-    if (kind === 'palm') {
-      box(ctx, P, x + 0.4, y + 0.42, h, 0.22, 0.2, 2.1, '#a77c46', '#c9a066');
-      box(ctx, P, x - 0.6, y + 0.3, h + 2.1, 2.4, 0.4, 0.14, leaf, top);
-      box(ctx, P, x + 0.35, y - 0.6, h + 2.1, 0.32, 2.2, 0.14, leaf, top);
-      return;
-    }
-    if (kind === 'dead') {
-      box(ctx, P, x + 0.4, y + 0.42, h, 0.2, 0.2, 1.5, leaf, top);
-      box(ctx, P, x + 0.15, y + 0.45, h + 0.9, 0.3, 0.1, 0.1, leaf);
-      return;
-    }
-    if (kind === 'birch') {
-      box(ctx, P, x + 0.4, y + 0.42, h, 0.2, 0.2, 1.5, '#e8e4d8', '#f3efe6');
-      for (const z of [0.3, 0.75, 1.15]) box(ctx, P, x + 0.4, y + 0.6, h + z, 0.12, 0.02, 0.06, '#3a3a44');
-      this.leafy(P, x + 0.05, y + 0.12, h + 1.3, 0.9, 0.8, 0.9, leaf, top, x, y);
-      this.leafy(P, x + 0.2, y + 0.25, h + 2.2, 0.6, 0.5, 0.45, leaf, top, x + 1, y);
-      return;
-    }
-    box(ctx, P, x + 0.36, y + 0.38, h, 0.28, 0.28, 1.2, '#7a5432', '#93683f');
-    // Runde, buschige Krone: Mitte am breitesten, darüber kleinere Klumpen leicht versetzt
-    this.leafy(P, x - 0.1, y + 0.1, h + 1.05, 1.2, 0.85, 0.55, leaf, top, x, y);
-    this.leafy(P, x - 0.38, y + 0.02, h + 1.45, 1.76, 1.0, 0.75, leaf, top, x + 1, y);
-    this.leafy(P, x - 0.2, y + 0.12, h + 2.2, 0.85, 0.75, 0.5, leaf, top, x + 2, y);
-    this.leafy(P, x + 0.45, y + 0.2, h + 2.1, 0.6, 0.6, 0.45, leaf, top, x + 3, y);
-    if (kind === 'blossom')
-      for (let i = 0; i < 6; i++) {
-        const r = hash(17, x, y, i);
-        box(ctx, P, x - 0.15 + (r % 120) / 100, y + 1, h + 1.15 + ((r >>> 8) % 70) / 100, 0.08, 0.02, 0.08, '#ffffff');
-      }
-  }
-
   /** Warmes Licht von oben links, Dunst in der Ferne (oben im Bild) und dunklere Ränder */
   private atmosphere(sc: Scene) {
     const { ctx } = this;
@@ -683,67 +607,26 @@ export class Renderer {
     const ice = c.biome ? drawDeco(this.views.get(c.biome) ?? null, world, c, x, y, this.at) : null;
     // gezeichnet erst in der Reihe ihrer Vorderkante: sonst deckte der Boden der Reihen davor die Kuppel unten zu
     if (ice) return void this.later.push(...ice);
+    // Hängt nur an Feld, Ding und Beeren (Nachbarn von Hecke und Zaun, Unterstand stehen mit der Welt fest)
+    const key = `${c.deco},${c.tree},${c.h},${c.color},${`${x},${y}` in state.picked}`;
+    const things = this.things(world, x, y, key, () => {
+      const boxes = decoBoxes(world, c, x, y, state.picked, () => homeAt(world, x, y).shelter);
+      // der Hut am Unterstand spannt über mehrere Reihen: nur sortiert, nicht geklemmt
+      return boxes && (c.deco === 'shelterpilz' ? sortBoxes(boxes) : clampRow(boxes, y));
+    });
+    if (things) {
+      const under = c.deco ? SHADOW[c.deco] : undefined;
+      if (under) this.shadow(P, x + 0.5, y + under[0], h, under[1]);
+      // der Hut am Unterstand ist durchscheinend, solange die Figur zu Hause ist (`openRoof`)
+      const roofed = c.deco === 'shelterpilz';
+      for (const b of things) {
+        ctx.globalAlpha = roofed && b[8] === 'see' ? this.roof : 1;
+        drawBox(ctx, P, b);
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
     switch (c.deco) {
-      case 'tree':
-        this.tree(P, x, y, h, c.tree ?? 'oak');
-        break;
-      case 'bush':
-        this.shadow(P, x + 0.5, y + 0.55, h, 0.42);
-        this.leafy(P, x + 0.08, y + 0.12, h, 0.84, 0.76, 0.5, '#3f9a3c', '#5ab651', x, y);
-        this.leafy(P, x + 0.2, y + 0.22, h + 0.5, 0.6, 0.56, 0.16, '#3f9a3c', '#5ab651', x, y);
-        // rote Beeren vorn und oben, damit man den Busch erkennt (gepflückt: keine, bis sie nachwachsen)
-        if (!(`${x},${y}` in state.picked))
-          for (const [bx, bz, bh] of [
-            [0.2, 0.86, 0.3],
-            [0.5, 0.86, 0.18],
-            [0.72, 0.86, 0.34],
-            [0.3, 0.34, 0.66],
-            [0.56, 0.5, 0.66],
-          ] as const)
-            box(ctx, P, x + bx, y + bz, h + bh, 0.09, 0.06, 0.09, '#c8323a', '#ef5b5b');
-        break;
-      case 'fern':
-        for (const [fx, fy, fh] of [
-          [0.3, 0.45, 0.32],
-          [0.48, 0.38, 0.4],
-          [0.62, 0.5, 0.3],
-          [0.42, 0.58, 0.26],
-        ] as const)
-          box(ctx, P, x + fx - 0.05, y + fy, h, 0.1, 0.06, fh, '#3c8a34', '#58a73a');
-        box(ctx, P, x + 0.28, y + 0.42, h + 0.2, 0.44, 0.14, 0.04, '#4f9a3c', '#6dbd47');
-        break;
-      case 'boulder':
-        this.shadow(P, x + 0.5, y + 0.55, h, 0.4);
-        box(ctx, P, x + 0.14, y + 0.2, h, 0.72, 0.6, 0.42, '#878c93', '#9aa0a7');
-        box(ctx, P, x + 0.26, y + 0.28, h + 0.42, 0.46, 0.38, 0.16, '#8f949b', '#a8adb3');
-        box(ctx, P, x + 0.3, y + 0.3, h + 0.58, 0.3, 0.2, 0.03, '#5f9a3c', '#6dbd47');
-        break;
-      case 'mushroom':
-        box(ctx, P, x + 0.44, y + 0.46, h, 0.1, 0.1, 0.16, '#f3efe6');
-        box(ctx, P, x + 0.34, y + 0.36, h + 0.16, 0.3, 0.3, 0.1, '#d9473a', '#e0574a');
-        box(ctx, P, x + 0.42, y + 0.42, h + 0.26, 0.05, 0.05, 0.01, '#ffffff');
-        box(ctx, P, x + 0.54, y + 0.5, h + 0.26, 0.05, 0.05, 0.01, '#ffffff');
-        break;
-      case 'flower':
-        box(ctx, P, x + 0.47, y + 0.47, h, 0.06, 0.06, 0.16, '#3f9a3c');
-        box(ctx, P, x + 0.41, y + 0.41, h + 0.16, 0.18, 0.18, 0.1, c.color ?? '#ffffff', '#f2d14b');
-        break;
-      case 'reed':
-        box(ctx, P, x + 0.3, y + 0.5, h, 0.06, 0.06, 0.5, '#5f8f3a');
-        box(ctx, P, x + 0.6, y + 0.3, h, 0.06, 0.06, 0.62, '#5f8f3a');
-        box(ctx, P, x + 0.59, y + 0.29, h + 0.62, 0.08, 0.08, 0.14, '#7a5432');
-        break;
-      case 'lily':
-        box(ctx, P, x + 0.25, y + 0.3, 0.8, 0.5, 0.4, 0.03, '#4f9a3c', '#6dbd47');
-        box(ctx, P, x + 0.45, y + 0.42, 0.83, 0.12, 0.12, 0.06, '#e77fb3');
-        break;
-      case 'hedge':
-      case 'arch':
-        this.hedge(P, world, x, y, h, c.deco);
-        break;
-      case 'fence':
-        this.fence(P, world, x, y, h, 1);
-        break;
       case 'biggate': // Torhaus: Tür (je nach Öffnung), Türme, Torbogen; führt der Pinguin hierher, sein Umriss
       case 'gatetower':
         bigGate(ctx, P, world, c, x, y, h, sc.gates, this.guest);
@@ -752,61 +635,11 @@ export class Renderer {
       case 'portalrim':
         drawPlatform(ctx, P, world, state, x, y, h, c.portal!);
         break;
-      case 'cactus':
-        box(ctx, P, x + 0.37, y + 0.42, h, 0.26, 0.2, 1.35, '#3f8f3a', '#5aab4a');
-        box(ctx, P, x + 0.13, y + 0.45, h + 0.55, 0.14, 0.14, 0.55, '#3f8f3a', '#5aab4a');
-        box(ctx, P, x + 0.73, y + 0.45, h + 0.8, 0.14, 0.14, 0.45, '#3f8f3a', '#5aab4a');
-        break;
-      case 'crystal':
-        box(ctx, P, x + 0.36, y + 0.4, h, 0.28, 0.24, 1.15, c.color ?? '#b48cf0');
-        box(ctx, P, x + 0.14, y + 0.55, h, 0.2, 0.16, 0.7, c.color ?? '#b48cf0');
-        break;
-      case 'stalagmite':
-        box(ctx, P, x + 0.22, y + 0.3, h, 0.56, 0.5, 0.5, '#2a2c33', '#3c3f47');
-        box(ctx, P, x + 0.32, y + 0.38, h + 0.5, 0.36, 0.32, 0.5, '#2a2c33', '#3c3f47');
-        box(ctx, P, x + 0.41, y + 0.45, h + 1.0, 0.18, 0.16, 0.45, '#2a2c33', '#3c3f47');
-        break;
-      case 'bigshroom':
-        box(ctx, P, x + 0.36, y + 0.42, h, 0.28, 0.24, 1.4, '#efe4d2', '#f7efe2');
-        box(ctx, P, x - 0.25, y - 0.1, h + 1.4, 1.5, 1.2, 0.45, c.color ?? '#d9473a');
-        break;
-      case 'trough':
-      case 'watertrough':
-        box(ctx, P, x + 0.05, y + 0.15, h, 0.9, 0.72, 0.48, '#8a5a30', '#a0703f');
-        box(
-          ctx,
-          P,
-          x + 0.13,
-          y + 0.23,
-          h + 0.4,
-          0.74,
-          0.56,
-          0.08,
-          c.deco === 'trough' ? '#d9b85a' : '#3f8fd8',
-          c.deco === 'trough' ? '#ecd27a' : '#7fc0f0',
-        );
-        break;
-      case 'shelterpilz': {
-        // Riesenpilz: Stiel mit Kragen, darüber der rote Hut mit Tupfen (über die ganze Breite des Unterstands)
-        const { x0, y0, x1, y1 } = homeAt(world, x, y).shelter;
-        box(ctx, P, x + 0.15, y + 0.15, h, 0.7, 0.7, 3.2, '#efe4d2', '#f7efe2');
-        const [w, d] = [x1 - x0 + 1 + 2 * PILZ_OVER, y1 - y0 + 1 + 2 * PILZ_OVER];
-        ctx.globalAlpha = this.roof; // der Hut wird durchscheinend, solange die Figur zu Hause ist (`openRoof`)
-        box(ctx, P, x0 - PILZ_OVER, y0 - PILZ_OVER, h + 3.2, w, d, 0.45, '#d9473a', '#e0574a');
-        box(ctx, P, x0 - PILZ_OVER + 0.9, y0 - PILZ_OVER + 0.7, h + 3.65, w - 1.8, d - 1.4, 0.45, '#d9473a', '#e0574a');
-        for (const dx of [0.6, 2.4, 4.4, 6.2])
-          box(ctx, P, x0 - PILZ_OVER + dx, y1 + 1 + PILZ_OVER - 0.05, h + 3.3, 0.5, 0.05, 0.3, '#ffffff');
-        ctx.globalAlpha = 1;
-        break;
-      }
-      case 'cloudpuff':
-        box(ctx, P, x + 0.15, y + 0.3, h, 0.6, 0.4, 0.3, '#e6eef7', '#ffffff');
-        break;
       case 'klangstein':
         drawStone(ctx, P, x, y, h, heardStone(state, c.story!), sc.now, sc.reduced);
         break;
       case 'gate':
-        this.fence(P, world, x, y, h, 1 - (sc.gates.get(c.gate!) ?? 0));
+        for (const b of clampRow(fenceBoxes(world, x, y, h, 1 - (sc.gates.get(c.gate!) ?? 0)), y)) drawBox(ctx, P, b);
         break;
       case 'bridge': {
         const t = sc.gates.get(c.gate!) ?? 0;
@@ -826,71 +659,6 @@ export class Renderer {
         this.sign(P, state, x, y, h, c);
         break;
     }
-  }
-
-  /** Hecke um den Garten: Blätterbüsche, die zu Nachbarn mit Hecke verbunden sind; der Rosenbogen ist der Eingang */
-  private hedge(P: Projection, world: World, x: number, y: number, h: number, kind: 'hedge' | 'arch') {
-    const { ctx } = this;
-    const joins = (dx: number, dy: number) => {
-      const d = world.cell(x + dx, y + dy).deco;
-      return d === 'hedge' || d === 'arch';
-    };
-    const leaf = '#3f9a3c',
-      light = '#5ab651';
-    if (kind === 'arch') {
-      const vertical = joins(0, -1) || joins(0, 1);
-      const posts: [number, number][] = vertical
-        ? [
-            [0.38, 0.02],
-            [0.38, 0.8],
-          ]
-        : [
-            [0.02, 0.38],
-            [0.8, 0.38],
-          ];
-      for (const [px, py] of posts)
-        box(ctx, P, x + px, y + py, h, 0.18, 0.18, 1.25, GAME_COLORS.fenceDark, GAME_COLORS.fence);
-      if (vertical) box(ctx, P, x + 0.36, y, h + 1.25, 0.22, 1, 0.18, leaf, light);
-      else box(ctx, P, x, y + 0.36, h + 1.25, 1, 0.22, 0.18, leaf, light);
-      for (let i = 0; i < 4; i++) {
-        const t = 0.15 + i * 0.23;
-        const [rx, ry] = vertical ? [x + 0.44, y + t] : [x + t, y + 0.44];
-        box(ctx, P, rx, ry, h + 1.43, 0.1, 0.1, 0.06, i % 2 ? '#e77fb3' : '#ffffff');
-      }
-      return;
-    }
-    if (joins(0, -1)) box(ctx, P, x + 0.2, y, h, 0.6, 0.5, 0.6, leaf, light);
-    if (joins(-1, 0)) box(ctx, P, x, y + 0.2, h, 0.5, 0.6, 0.6, leaf, light);
-    if (joins(1, 0)) box(ctx, P, x + 0.5, y + 0.2, h, 0.5, 0.6, 0.6, leaf, light);
-    if (joins(0, 1)) box(ctx, P, x + 0.2, y + 0.5, h, 0.6, 0.5, 0.6, leaf, light);
-    box(ctx, P, x + 0.15, y + 0.15, h, 0.7, 0.7, 0.7, leaf, light);
-    if ((x * 31 + y * 17) % 3 === 0) box(ctx, P, x + 0.45, y + 0.5, h + 0.7, 0.1, 0.1, 0.05, '#f2d14b');
-  }
-
-  /** Zaun: Pfosten in der Mitte, Latten zu jedem Nachbarn mit Zaun oder Tor. `closed` < 1 öffnet ein Tor. */
-  private fence(P: Projection, world: World, x: number, y: number, h: number, closed: number) {
-    const { ctx } = this;
-    const joins = (dx: number, dy: number) => {
-      const n = world.cell(x + dx, y + dy);
-      return n.deco === 'fence' || n.deco === 'gate';
-    };
-    const gate = world.cell(x, y).deco === 'gate';
-    const color = GAME_COLORS.fence,
-      dark = GAME_COLORS.fenceDark;
-    if (gate) {
-      // Torflügel: offen klappt er zur Seite weg (wird schmaler)
-      const vertical = joins(0, -1) || joins(0, 1);
-      if (closed > 0) {
-        if (vertical) box(ctx, P, x + 0.42, y + 0.5 - 0.5 * closed, h, 0.16, closed, 0.8, color, dark);
-        else box(ctx, P, x + 0.5 - 0.5 * closed, y + 0.42, h, closed, 0.16, 0.8, color, dark);
-      }
-      return;
-    }
-    if (joins(0, -1)) box(ctx, P, x + 0.45, y, h + 0.3, 0.1, 0.5, 0.12, color, dark);
-    if (joins(-1, 0)) box(ctx, P, x, y + 0.45, h + 0.3, 0.5, 0.1, 0.12, color, dark);
-    if (joins(1, 0)) box(ctx, P, x + 0.5, y + 0.45, h + 0.3, 0.5, 0.1, 0.12, color, dark);
-    if (joins(0, 1)) box(ctx, P, x + 0.45, y + 0.5, h + 0.3, 0.1, 0.5, 0.12, color, dark);
-    box(ctx, P, x + 0.4, y + 0.4, h, 0.2, 0.2, 0.75, color, dark);
   }
 
   /** Tafel am Tor: Holzbrett, darauf die Tiere der Gegend – getroffene in Farbe, fehlende als Umriss */

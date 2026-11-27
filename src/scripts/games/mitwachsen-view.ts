@@ -4,7 +4,7 @@
 // einfacher Block in Kartenfarbe. Gleich für 2D und die Ebene über 3D (dort nur Wetter und Leiste).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
-import { box, type Projection } from '../../lib/games/front';
+import { box, type Fine, type Projection } from '../../lib/games/front';
 import type { GateId, RegionId, SpeciesId } from '../../data/games/mitwachsen';
 import type { HeraldEvent } from './mitwachsen-herald';
 import type { Deco } from './mitwachsen-cell';
@@ -22,9 +22,21 @@ import type { PlateLook } from './mitwachsen-plate';
 /**
  * Quader: x (rechts), y (nach vorn), z (Höhe), Breite, Tiefe, Höhe, Farbe der Seiten und oben, Art in 3D: `see` wird
  * vor der Figur durchsichtig (wie Laub und der Hut des Riesenpilzes), `sway` wiegt sich im Wind (wie die Grasbüschel),
- * `glow` leuchtet aus sich selbst, so hell, wie das Paket sagt (`View3D.glow`; Eiskristalle beim Polarlicht)
+ * `glow` leuchtet aus sich selbst, so hell, wie das Paket sagt (`View3D.glow`; Eiskristalle beim Polarlicht); zuletzt
+ * die Feinheit (`Fine`: Muster, Leuchten kompakter Teile), die erst ein feiner Maler zeigt
  */
-export type Box = readonly [number, number, number, number, number, number, string, string, ('see' | 'sway' | 'glow')?];
+export type Box = readonly [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  string,
+  string,
+  ('see' | 'sway' | 'glow')?,
+  Fine?,
+];
 
 /**
  * Töne zu einem Ereignis aus den Regeln einer Welt: Jedes geladene Paket wird gefragt und antwortet nur auf die
@@ -39,7 +51,7 @@ export const awayIn = (views: Iterable<View2D>, x: number, y: number, now: numbe
 
 /** Einen Quader von vorn zeichnen (nichts, wenn keiner da ist) */
 export function drawBox(ctx: CanvasRenderingContext2D, P: Projection, b: Box | null | undefined) {
-  if (b) box(ctx, P, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]);
+  if (b) box(ctx, P, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[9]);
 }
 
 /**
