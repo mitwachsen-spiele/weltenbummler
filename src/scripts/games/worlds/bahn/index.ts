@@ -18,7 +18,7 @@
 // Schmuck mit Zug (mitwachsen-feast-look.ts): Pfeif-Gruß der Murmeltiere, die Laternenfahrt nach voller Höhlen-Leiste
 // (`feast`, danach der Kristall-Wimpel), warmes Licht ab 20 min und „Gute Nacht, Bahn“ mit Nachtlicht.
 // Das Spiel holt es, sobald das Eistor offen ist (`bahnWanted`); der Entwickler-Schalter spielt seine Stände vor
-// (`/spielen/?entwickler=bahn`, mitwachsen-dev.ts). Nichts außerhalb dieses Ordners importiert statisch von hier
+// (`/?entwickler=bahn`, mitwachsen-dev.ts). Nichts außerhalb dieses Ordners importiert statisch von hier
 // (geprüft durch `npm run arch`): im Build `_astro/welt-bahn.<hash>.js`, sein 3D-Teil `_astro/welt-bahn-3d.<hash>.js`,
 // beide mit eigener Grenze (scripts/verify-bundles.ts).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitte „Welt-Pakete“ und „Tok und die Bahn“)

@@ -1,6 +1,6 @@
-// Guard-Gate nach dem Build (Teil von npm run verify): Die Startseite bleibt schnell und ohne Ballast.
-// Die Startseite lädt gar kein JavaScript, weder als Datei noch eingebettet. Seiten außerhalb von /spielen/ laden kein Spiel und kein Three.js und bleiben unter einem festen Budget.
-// Die Spielseite lädt beim Start nur ihren eigenen Code (den Kern); Three.js (im Build _astro/three.<hash>.js) kommt
+// Guard-Gate nach dem Build (Teil von npm run verify): Das Spiel lädt schnell und ohne Ballast.
+// Das Spiel liegt an der Wurzel (index.html). Andere Seiten (404) laden kein Spiel und kein Three.js und bleiben unter
+// einem festen Budget. Die Spielseite lädt beim Start nur ihren eigenen Code (den Kern); Three.js (im Build _astro/three.<hash>.js) kommt
 // nur nachträglich per import() und hat eine eigene Grenze, an seine Version gebunden. Die 3D-Ansicht ohne Three.js
 // (samt der nachgeladenen Drehung zur Torfront) enthält nichts, was nur eine Welt hinter einem Tor braucht. Jedes
 // Welt-Paket (src/scripts/games/worlds/, im Build _astro/welt-<welt>.<hash>.js) misst samt seinem 3D-Teil
@@ -8,7 +8,7 @@
 // Grenzen mit Luft statt Tretmühle: Jede Grenze liegt bei gemessen + gut 10 % (Three.js + 5 %). Angehoben wird erst,
 // wenn weniger als 3 % Luft bleiben, und dann wieder auf gemessen + 10 %, mit einem Satz Begründung in der
 // Commit-Nachricht. Kein Tagebuch neben den Zahlen: Die Geschichte steht in git. Die wahren/falschen Regeln (kein
-// JavaScript auf der Startseite, kein Spiel und kein Three.js außerhalb, Three.js nur per import(), Proben) bleiben fest.
+// Spiel und kein Three.js außerhalb der Spielseite, Three.js nur per import(), Proben) bleiben fest.
 // Logik und Tests: scripts/bundles.ts, scripts/bundles.test.ts
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -20,12 +20,11 @@ const DIST = 'dist';
 const GAME_CODE = /larmic-mitwachsen|Mitwachsen|WebGLRenderer|three\.module|serviceWorker/;
 
 export const RULES: Rule[] = [
-  // Die Startseite holt kein JavaScript: keine Datei, kein eingebettetes Skript (Budget 0)
-  { name: 'Startseite ohne JavaScript', pages: /^index\.html$/, budget: 0, forbidden: GAME_CODE },
-  { name: 'Startseite ohne Spiel', pages: /^(?!spielen\/)/, budget: 32 * 1024, forbidden: GAME_CODE },
+  // Alle Seiten außer dem Spiel (404) bleiben ohne Spielcode und im festen Budget
+  { name: 'Seiten ohne Spiel', pages: /^(?!index\.html$)/, budget: 32 * 1024, forbidden: GAME_CODE },
   {
     name: 'Spiel lädt 3D erst bei Bedarf',
-    pages: /^spielen\//,
+    pages: /^index\.html$/,
     // Kern: Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
     // Gemessen 157,8 KB (mit dem Hinführen zu Sehenswürdigkeiten: Regeln, Funkelfreund, Ruf)
     budget: 173.6 * 1024,
@@ -34,7 +33,7 @@ export const RULES: Rule[] = [
   },
   {
     name: 'Three.js',
-    pages: /^spielen\/index\.html$/,
+    pages: /^index\.html$/,
     // nur per import() erreichbar (kommt es beim Laden, meldet das Gate es), in eigener Datei three.<hash>.js
     chunks: /\/three\.[\w-]+\.js$/,
     // An die Version von Three.js gebunden (0.187): gemessen 530 152 Bytes (517,7 KB), dazu 5 % Luft.
@@ -44,7 +43,7 @@ export const RULES: Rule[] = [
   },
   {
     name: '3D-Ansicht',
-    pages: /^spielen\/index\.html$/,
+    pages: /^index\.html$/,
     parts: [
       // 3D-Ansicht samt Zugängen, ohne Three.js (eigene Regel oben)
       { chunks: /\/mitwachsen-3d\.[\w-]+\.js$/, after: /\/three\.[\w-]+\.js$/ },
@@ -59,7 +58,7 @@ export const RULES: Rule[] = [
   },
   {
     name: 'Welt-Paket Eis',
-    pages: /^spielen\/index\.html$/, // nur die Spielseite lädt Welt-Pakete
+    pages: /^index\.html$/, // nur die Spielseite lädt Welt-Pakete
     parts: [
       // Gletscherkessel, Regeln des Pinguins, der Schlitten (Strecke, Bild; seine Fahrregeln im Paket der Fahrzeuge),
       // Zeichenteile der 2D-Ansicht und Modelle der Eis-Tiere
@@ -74,7 +73,7 @@ export const RULES: Rule[] = [
   },
   {
     name: 'Welt-Paket Höhle',
-    pages: /^spielen\/index\.html$/,
+    pages: /^index\.html$/,
     parts: [
       // Kristallgrotte (Lage, Gelände, Zuhause, Licht, Portal am See, Fundorte der Höhlen-Tiere, Pilzbeete, Tropfquelle,
       // Tropfmoos), ihr Schmuck (Säulen-Glockenspiel mit Fledermaus-Runde, Grottenolm am Steg, Tropfsteine), ihre Füllung
@@ -96,7 +95,7 @@ export const RULES: Rule[] = [
   },
   {
     name: 'Welt-Paket Bahn',
-    pages: /^spielen\/index\.html$/,
+    pages: /^index\.html$/,
     parts: [
       // Gleis der Höhlenbahn auf Lichtung und Grotte: Trassen-Suche, Bahnhof Bär, Zeichenteile der 2D-Ansicht; Tok, der
       // Bote der Höhlenwelt (Regeln, Modell, Bild und Ton); Bau 1 mit Bahnhof Bär und Zug (Modelle, Körper, Töne); der Zug
@@ -113,7 +112,7 @@ export const RULES: Rule[] = [
   },
   {
     name: 'Welt-Paket Fahrzeuge',
-    pages: /^spielen\/index\.html$/,
+    pages: /^index\.html$/,
     // Die Fahr-Engine aller Fahrzeuge (einsteigen, fahren, Hindernis, Tunnel, ankommen), samt dem, was sie mit den Paketen
     // der Fahrzeuge teilt (Halte, Spielstand packs.fahrt); keine eigene Welt, kein 3D-Teil. Kommt, sobald es ein Fahrzeug
     // geben kann (Eistor offen); dazu das Schlafen am Halt, solange ein Paket fehlt (Vorladen), das Fest je Fahrzeug
@@ -125,7 +124,7 @@ export const RULES: Rule[] = [
   },
   {
     name: 'Welt-Paket Grubenbahn',
-    pages: /^spielen\/index\.html$/,
+    pages: /^index\.html$/,
     // Das Grubenbähnchen Funkel in der Grotte: sein schmales Gleis (legen und zeichnen, für 2D und 3D dieselben Quader,
     // darum kein eigener 3D-Teil), seine Strecke als Schleife, Modell, Körper und Töne; samt dem, was es mit den anderen
     // Fahrzeugen teilt (Spielstand packs.fahrt); dazu der Glitzergang mit den zwei Klingeltoren (Tore, Scheibe,
@@ -140,7 +139,7 @@ export const RULES: Rule[] = [
   },
   {
     name: 'Nachgeladen vom Kern',
-    pages: /^spielen\/index\.html$/,
+    pages: /^index\.html$/,
     // Seltenes, das der Kern erst bei Bedarf holt: „noch nicht“ an den Toren (Bild, Ton, Live-Region), Inhalt des
     // Menüs, Postkarte der Torfront, Anmeldung des Service Workers
     parts: [{ chunks: /\/(mitwachsen-(hint-look|menu|card)|pwa-register)\.[\w-]+\.js$/ }],
@@ -168,12 +167,12 @@ const usage: Usage[] = [];
 const problems = pages.flatMap((file) => check(relative(DIST, file), readFileSync(file, 'utf8'), read, RULES, usage));
 const kib = (n: number) => `${(n / 1024).toFixed(1)} KB`;
 const budgetOf = (name: string) => RULES.find((r) => r.name === name)?.budget ?? 0;
-for (const u of usage.filter((x) => x.page.startsWith('spielen/')))
+for (const u of usage.filter((x) => x.page === 'index.html'))
   console.log(`  ${u.rule}: ${u.file ?? u.page} ${kib(u.bytes)} von ${kib(budgetOf(u.rule))}`);
 if (problems.length) {
   console.error(`Bundle-Gate: ${problems.length} Verstoß/Verstöße\n` + problems.map((p) => `  ✖ ${p}`).join('\n'));
   process.exit(1);
 }
 console.log(
-  `✓ Bundle-Gate: ${pages.length} Seiten geprüft, Startseite ohne Spiel, Kern, 3D-Ansicht und Welt-Pakete im Budget`,
+  `✓ Bundle-Gate: ${pages.length} Seiten geprüft, übrige Seiten ohne Spiel, Kern, 3D-Ansicht und Welt-Pakete im Budget`,
 );

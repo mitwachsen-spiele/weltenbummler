@@ -81,7 +81,7 @@ export const view3d = (page: Page, id: string) =>
  * Die Spielseite aufrufen, ohne zu warten. Nur für Tests, die das Laden selbst prüfen (ohne JavaScript, ohne Netz, der
  * Hinweis für Eltern beim ersten Mal); sonst `openGame`
  */
-export const gotoGame = (page: Page, dev?: string) => page.goto(dev ? `/spielen/?entwickler=${dev}` : '/spielen/');
+export const gotoGame = (page: Page, dev?: string) => page.goto(dev ? `/?entwickler=${dev}` : '/');
 
 /**
  * Test-Uhr der Seite, vor ihrem ersten Skript: `performance.now()` – die eine Uhr des Spiels für Takt, Tasten und Bild –

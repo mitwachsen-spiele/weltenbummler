@@ -69,7 +69,7 @@ export function staleCaches(
 export type ServiceWorkerOptions = {
   version: string; // ändert sich mit jedem Inhalt (cacheVersion)
   files: string[]; // was vorab gespeichert wird
-  scope: string; // z. B. "/spielen/"
+  scope: string; // z. B. "/"
   prefix: string; // Präfix der eigenen Caches, z. B. "mitwachsen-"
 };
 

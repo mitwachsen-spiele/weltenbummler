@@ -1,4 +1,4 @@
-// Astro-Integration: schreibt nach dem Build den Service Worker des Spiels (dist/spielen/sw.js). Was er vorab
+// Astro-Integration: schreibt nach dem Build den Service Worker des Spiels (dist/sw.js). Was er vorab
 // speichert, wird aus der fertigen Seite gesammelt (src/lib/pwa/precache.ts), damit keine Datei mit Hash im Namen
 // fehlt – auch nicht das nachträglich geladene Three.js. Fehlt eine Datei, auf die die Seite verweist, bricht der
 // Build ab. Geprüft wird das Ergebnis zusätzlich von npm run verify:pwa.

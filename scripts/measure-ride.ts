@@ -53,7 +53,7 @@ async function waitServer() {
 
 /** Ein Lauf: einsteigen, Tempo setzen, bis zur Ankunft fahren (bzw. im Stand warten), Messwerte */
 async function run(page: Page, speed: number, stillMs: number) {
-  await page.goto(`${BASE}/spielen/?entwickler=bahn&bau=1`);
+  await page.goto(`${BASE}/?entwickler=bahn&bau=1`);
   await page.waitForSelector('larmic-mitwachsen.settled.three', { timeout: 60_000 });
   const ok = page.getByRole('button', { name: /Verstanden/ });
   if (await ok.isVisible()) await ok.click();

@@ -2,6 +2,8 @@
 // Hinweis für Eltern zur Bildschirmzeit: steht im Dialog des Spiels (beim ersten Öffnen und über Menü und Sprechblase)
 // und ohne JavaScript im Text der Seite. Quellen sind normale Links, geladen wird erst beim Klick.
 // Stand der Quellen: November 2026. Konzept: docs/games/mitwachsen.md
+import { HOME_URL } from '../data/site';
+
 interface Props {
   headingId: string;
 }
@@ -35,7 +37,7 @@ const { headingId } = Astro.props;
 </p>
 <p class="mw-store">
   Spielstand und Einstellungen bleiben nur im Browser dieses Geräts, ohne Cookies und ohne Übertragung. Mehr dazu in der
-  <a href="/datenschutz/">Datenschutzerklärung</a>.
+  <a href={`${HOME_URL}datenschutz/`}>Datenschutzerklärung</a>.
 </p>
 <p class="mw-sources">Quellen:</p>
 <ul class="mw-sources">

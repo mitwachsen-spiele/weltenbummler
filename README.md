@@ -1,10 +1,10 @@
-# mitwachsen-spiele.de
+# Weltenbummler
 
-> **Umzug läuft (27.11.2026):** Dieses Repo setzt [larmic/mitwachsen-spiele](https://github.com/larmic/mitwachsen-spiele) mit voller Historie fort (Stand `1128428`). Das Spiel zieht nach https://weltenbummler.mitwachsen-spiele.de/ und heißt künftig „Weltenbummler“, die Homepage kommt nach [mitwachsen-spiele/website](https://github.com/mitwachsen-spiele/website). Bis zum Abschluss liefert weiter das alte Repo aus. Fortschritt: larmic/mitwachsen-spiele#71.
+> **Umzug läuft (November 2026):** Dieses Repo setzt [larmic/mitwachsen-spiele](https://github.com/larmic/mitwachsen-spiele) mit voller Historie fort (Stand `1128428`). Das Spiel liegt hier an der Wurzel und geht unter https://weltenbummler.mitwachsen-spiele.de/ live; es heißt künftig „Weltenbummler“. Die Homepage mit Seite für Eltern und Datenschutz liegt in [mitwachsen-spiele/website](https://github.com/mitwachsen-spiele/website). Bis zum Go-live liefert www.mitwachsen-spiele.de/spielen/ weiter das alte Repo. Fortschritt: larmic/mitwachsen-spiele#71.
 
-Mitwachsen: ein ruhiges Spiel für Kinder ab 3 Jahren, das man zusammen mit Mama oder Papa spielt. Ohne Werbung, ohne Punkte, kostenlos im Browser. Gebaut mit [Astro](https://astro.build), ausgeliefert als statische Seite über GitHub Pages unter https://www.mitwachsen-spiele.de.
+Mitwachsen: ein ruhiges Spiel für Kinder ab 3 Jahren, das man zusammen mit Mama oder Papa spielt. Ohne Werbung, ohne Punkte, kostenlos im Browser. Gebaut mit [Astro](https://astro.build), ausgeliefert als statische Seite über GitHub Pages unter https://weltenbummler.mitwachsen-spiele.de/.
 
-Das Spiel stammt von [larmic.de](https://larmic.de) und hat hier eine eigene Seite bekommen.
+Das Spiel stammt von [larmic.de](https://larmic.de). Die Seite für Eltern steht auf https://www.mitwachsen-spiele.de/ (Repo [website](https://github.com/mitwachsen-spiele/website)).
 
 ## Schnellstart
 
@@ -27,8 +27,8 @@ Die Seite läuft dann unter http://localhost:4321 und lädt Änderungen sofort n
 | `npm run format` / `format:check` | Prettier formatiert bzw. prüft den Code. `format:check` ist Guard-Gate |
 | `npm run arch` | Architekturregeln (dependency-cruiser, `.dependency-cruiser.cjs`): Schichten `lib` → `data` → Oberfläche, Browser-Code ohne Build-Code. Guard-Gate |
 | `npm run build` | Erzeugt die fertige Seite in `dist/` |
-| `npm run verify` | Prüft die fertige Seite in `dist/`: gültiges HTML (html-validate), keine toten internen Links und Sprungmarken (linkinator), das Bundle-Gate (Startseite ohne JavaScript, weder als Datei noch eingebettet, übrige Seiten ohne Spiel und im JavaScript-Budget), das Seiten-Gate (keine externen Ressourcen ohne Klick) und das App-Gate (Manifest und Icons gültig, der Service Worker speichert alles, was das Spiel braucht, in einer Version, die zum Inhalt passt, und bleibt zusammen im Budget `PRECACHE_BUDGET`). Guard-Gate nach dem Build |
-| `npm run test:e2e` | Smoke-Test im Browser (Playwright, `e2e/`): Startseite (Weg ins Spiel, Aufbau, 320 px ohne seitliches Scrollen), Rechtliches, 404 und das Spiel, ohne Fehler in der Konsole; das Spiel als App (Manifest, installierbar laut Chromium, Service Worker, Start ohne Netz, Updates mit zwei echten Fassungen der Seite: die alte läuft weiter, die neue wartet und kommt an sicheren Stellen), dazu Barrierefreiheit jeder Seite nach WCAG 2.2 AA (axe-core). Guard-Gate nach dem Build; einmalig `npx playwright install chromium` |
+| `npm run verify` | Prüft die fertige Seite in `dist/`: gültiges HTML (html-validate), keine toten internen Links und Sprungmarken (linkinator), das Bundle-Gate (übrige Seiten ohne Spiel und im JavaScript-Budget, das Spiel mit Grenzen je Teil), das Seiten-Gate (keine externen Ressourcen ohne Klick) und das App-Gate (Manifest und Icons gültig, der Service Worker speichert alles, was das Spiel braucht, in einer Version, die zum Inhalt passt, und bleibt zusammen im Budget `PRECACHE_BUDGET`). Guard-Gate nach dem Build |
+| `npm run test:e2e` | Smoke-Test im Browser (Playwright, `e2e/`): das Spiel, Manifest, Wege zur Homepage und 404, ohne Fehler in der Konsole; das Spiel als App (Manifest, installierbar laut Chromium, Service Worker, Start ohne Netz, Updates mit zwei echten Fassungen der Seite: die alte läuft weiter, die neue wartet und kommt an sicheren Stellen), dazu Barrierefreiheit jeder Seite nach WCAG 2.2 AA (axe-core). Guard-Gate nach dem Build; einmalig `npx playwright install chromium` |
 | `npm run preview` | Zeigt den gebauten Stand aus `dist/` lokal an |
 | `npm run gates` | Alle Guard-Gates in der Reihenfolge der Pipeline, inklusive Build |
 
@@ -36,23 +36,20 @@ Die Seite läuft dann unter http://localhost:4321 und lädt Änderungen sofort n
 
 ```
 src/
-  pages/              / (Seite für Eltern), /spielen/ (das Spiel, noindex), /datenschutz/, 404,
+  pages/              / (das Spiel, noindex), 404,
                       dazu favicon, apple-touch-icon, Icons der App, manifest.webmanifest und og.png (beim Build erzeugt)
-  layouts/            BaseLayout (Kopfdaten; die Startseite baut darauf direkt auf), PlainPage (Himmel, Inhalt auf Papier, Footer)
-  content/games/      Eckdaten des Spiels im Frontmatter (Alter, Steuerung …), Schema in content.config.ts;
-                      alle Texte der Startseite stehen in data/landing.ts
+  layouts/            BaseLayout (Kopfdaten; das Spiel baut darauf direkt auf), PlainPage (Himmel, Inhalt auf Papier, Footer)
   components/         MitwachsenGame (Spielfläche), MitwachsenParentInfo (Hinweis für Eltern), Kopf, Footer …
   scripts/games/      das Spiel im Browser: Welt, Regeln, Speichern (rein, getestet), Web Component,
                       2D- und 3D-Ansicht (Three.js, per import() nachgeladen), Töne
   lib/games/          generische Spiel-Bausteine: Zufall, Stücke, Ansicht von vorn (läuft im Browser)
   lib/voxel/          Würfel-Grafik beim Build: Texturen, Würfel, Szene, Icon
   lib/pwa/            die App: Manifest, Liste für den Service Worker, Service Worker (rein, getestet)
-  integrations/       schreibt nach dem Build den Service Worker (dist/spielen/sw.js)
+  integrations/       schreibt nach dem Build den Service Worker (dist/sw.js)
   data/pwa.ts         Name, Farben und Icons der App, Ort des Service Workers
   data/games/         Gegenden, Tiere, Figur, Geschichten
-  data/site.ts        Titel, Adresse, strukturierte Daten für Suchmaschinen
-  data/landing.ts     alle Texte der Startseite
-  styles/             tokens.css (Design-Tokens), global.css, sections.css, landing.css (Startseite)
+  data/site.ts        Titel, Adresse, Adresse der Homepage
+  styles/             tokens.css (Design-Tokens), global.css, sections.css
 scripts/              Gates nach dem Build: Bundle-Gate, Seiten-Gate, App-Gate
 e2e/                  Smoke-Test und Barrierefreiheit (Playwright)
 docs/games/           Konzept des Spiels, Altersstufen, gemeinsame Regeln
@@ -63,7 +60,7 @@ docs/todo.md          Offene Punkte
 
 ## Installieren
 
-**Für Eltern:** Das Spiel lässt sich wie eine App auf den Home-Bildschirm legen, von der Startseite oder vom Spiel aus. Danach startet es direkt im Spiel, ohne Adressleiste, und läuft auch ohne Internet. Wichtig: Ohne Internet geht es erst, nachdem das Spiel einmal mit Internet geöffnet war. Wer von der Startseite aus installiert, startet die App also einmal mit Internet (oder öffnet vorher das Spiel), bevor es auf die Autofahrt geht.
+**Für Eltern:** Das Spiel lässt sich wie eine App auf den Home-Bildschirm legen. Danach startet es direkt im Spiel, ohne Adressleiste, und läuft auch ohne Internet. Wichtig: Ohne Internet geht es erst, nachdem das Spiel einmal mit Internet geöffnet war.
 
 | Gerät | Browser | So geht's |
 | --- | --- | --- |
@@ -78,7 +75,7 @@ Spielstände: Mit Safari (iPad, iPhone, Mac) hat die installierte App einen eige
 
 Das Spiel dreht sich mit dem Gerät, hoch und quer. Neue Versionen lädt die App still im Hintergrund, Eltern müssen nichts tun. Weil Tablets und Handys eine App meist nur anhalten statt sie zu schließen, übernimmt das Spiel eine neue Version selbst, aber nur in ruhigen Momenten: wenn die Figur ins Bett gegangen und das Schlaflied verklungen ist, oder wenn die App nach mindestens einer halben Stunde Pause wieder geöffnet wird und die Figur noch schläft. Dann lädt die Seite einmal kurz neu und zeigt danach genau dasselbe, die Nacht im Bett. Ein laufendes Spiel wird nie unterbrochen.
 
-**Für Entwickler:** Das Manifest (`/manifest.webmanifest`) und die Icons erzeugt der Build aus `src/data/pwa.ts`. Den Service Worker (`/spielen/sw.js`, gilt nur für `/spielen/`) schreibt die Integration `src/integrations/service-worker.ts` nach dem Build; die Liste der vorab gespeicherten Dateien sammelt sie aus der fertigen Seite, inklusive des per `import()` nachgeladenen Three.js. Angemeldet wird er nur im fertigen Build (`npm run build && npm run preview`), nicht mit `npm run dev`. Regeln und Update-Verhalten: [docs/specs/mitwachsen.md](docs/specs/mitwachsen.md) („App“, „Updates an sicheren Stellen“); die Entscheidungen stecken rein und getestet in `src/scripts/games/pwa-update.ts`. Den Weg von einer Fassung zur nächsten prüft `e2e/pwa-update.spec.ts` mit zwei echten Fassungen: Vor dem Browser-Test leitet `e2e/versions.ts` aus `dist/` eine zweite ab (neues Three.js, Service Worker mit demselben Code wie beim Build neu geschrieben), der Test-Server liefert sie mit dem Cookie `mw-version=2`. Zum Testen in den DevTools unter Application → Service Workers „Offline“ anhaken.
+**Für Entwickler:** Das Manifest (`/manifest.webmanifest`) und die Icons erzeugt der Build aus `src/data/pwa.ts`. Den Service Worker (`/sw.js`, gilt für die ganze Adresse `/`) schreibt die Integration `src/integrations/service-worker.ts` nach dem Build; die Liste der vorab gespeicherten Dateien sammelt sie aus der fertigen Seite, inklusive des per `import()` nachgeladenen Three.js. Angemeldet wird er nur im fertigen Build (`npm run build && npm run preview`), nicht mit `npm run dev`. Regeln und Update-Verhalten: [docs/specs/mitwachsen.md](docs/specs/mitwachsen.md) („App“, „Updates an sicheren Stellen“); die Entscheidungen stecken rein und getestet in `src/scripts/games/pwa-update.ts`. Den Weg von einer Fassung zur nächsten prüft `e2e/pwa-update.spec.ts` mit zwei echten Fassungen: Vor dem Browser-Test leitet `e2e/versions.ts` aus `dist/` eine zweite ab (neues Three.js, Service Worker mit demselben Code wie beim Build neu geschrieben), der Test-Server liefert sie mit dem Cookie `mw-version=2`. Zum Testen in den DevTools unter Application → Service Workers „Offline“ anhaken.
 
 ## Guard-Gates
 
@@ -91,7 +88,7 @@ Jeder Commit läuft durch dieselben deterministischen Prüfungen, egal ob ein Me
 | Architektur | Schichten: `lib` ist generisch, `data` kennt keine Oberfläche, Browser-Code bekommt keinen Build-Code, keine Zyklen | dependency-cruiser |
 | Typen und Inhalte | TypeScript strikt, auch jeder Zugriff per Index (`noUncheckedIndexedAccess`), Markdown-Inhalte gegen ihr Schema | astro check |
 | Unit-Tests | Regeln, Welt und Speichern des Spiels (Spec: [docs/specs/mitwachsen.md](docs/specs/mitwachsen.md)), Würfel-Grafik, die Gates selbst; die Abdeckung der reinen Module darf nicht sinken | Vitest, v8-Coverage |
-| Fertige Seite | gültiges HTML, keine toten internen Links und Sprungmarken, Startseite ohne Spiel und im JavaScript-Budget, das Spiel lädt 3D erst bei Bedarf, keine externen Ressourcen ohne Klick, Manifest und Service Worker vollständig, vorab Gespeichertes im Budget | html-validate, linkinator, Bundle-Gate, Seiten-Gate, App-Gate |
+| Fertige Seite | gültiges HTML, keine toten internen Links und Sprungmarken, übrige Seiten ohne Spiel und im JavaScript-Budget, das Spiel lädt 3D erst bei Bedarf, keine externen Ressourcen ohne Klick, Manifest und Service Worker vollständig, vorab Gespeichertes im Budget | html-validate, linkinator, Bundle-Gate, Seiten-Gate, App-Gate |
 | Im Browser | Seiten laden, das Spiel startet, auch ohne Netz, keine Fehler in der Konsole; installierbar laut Chromium; Updates von einer Fassung zur nächsten (zwei Fassungen, abgeleitet aus dem Build); Barrierefreiheit jeder Seite nach WCAG 2.2 AA | Playwright, axe-core |
 
 Lokal laufen alle zusammen mit `npm run gates`. Zusätzlich prüft ein Git-Hook (`.githooks/pre-commit`) vor jedem Commit die schnellen Gates – Formatierung, Lint, Architektur, Unit-Tests. `npm install` aktiviert ihn automatisch; im Notfall überspringt `git commit --no-verify` ihn.
@@ -125,7 +122,7 @@ Diese Einstellungen stehen nicht im Code und müssen einmal von Hand gesetzt wer
 
 ## Datenschutz und Recht
 
-- Impressum und Kontakt liegen auf larmic.de (`https://larmic.de/impressum/`, der Footer verlinkt dorthin); das Impressum dort gilt ausdrücklich auch für mitwachsen-spiele.de. Die Datenschutzerklärung ist eigen, unter `/datenschutz/`, weil sie nur beschreibt, was auf dieser Seite passiert.
+- Impressum und Kontakt liegen auf larmic.de (`https://larmic.de/impressum/`, der Footer verlinkt dorthin); das Impressum dort gilt ausdrücklich auch für mitwachsen-spiele.de samt Subdomains. Die Datenschutzerklärung steht auf der Homepage (https://www.mitwachsen-spiele.de/datenschutz/, Repo `website`) und gilt auch für das Spiel; was das Spiel speichert, muss dort stehen.
 - Beim Laden der Seite wird nichts von Dritten nachgeladen: Schriften sind lokal gebündelt, keine Cookies, kein Tracking.
 - Der Spielstand bleibt im Browser (`localStorage`) und wird nicht übertragen.
 - Der Service Worker speichert nur Dateien des Spiels von dieser Seite im Browser (Cache Storage), damit es ohne Netz startet; er sendet nichts.

@@ -1,9 +1,10 @@
 ---
 import { CUBE_VIEWBOX } from '../lib/voxel/cube';
+import { HOME_URL } from '../data/site';
 ---
 
 <div class="site-header">
-  <a class="logo" href="/">
+  <a class="logo" href={HOME_URL}>
     <svg width="34" height="36" viewBox={CUBE_VIEWBOX} aria-hidden="true">
       <use href="#v-grass"></use>
     </svg>

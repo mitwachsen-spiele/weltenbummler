@@ -21,7 +21,7 @@ test.describe.configure({ timeout: 60_000 });
 /** Cache-Name und 3D-Datei (Pfad, Größe) einer Fassung, aus ihrem Service Worker gelesen */
 function version(n: '1' | '2') {
   const dir = VERSIONS[n]!;
-  const sw = parseServiceWorker(readFileSync(join(dir, 'spielen/sw.js'), 'utf8'));
+  const sw = parseServiceWorker(readFileSync(join(dir, 'sw.js'), 'utf8'));
   const chunk = sw?.files.find((f) => CHUNK.test(f));
   if (!sw || !chunk) throw new Error(`Fassung ${n}: Service Worker ohne 3D-Datei`);
   return { cache: sw.cache, chunk, chunkBytes: statSync(join(dir, chunk)).size };
@@ -74,7 +74,7 @@ async function openApp(page: Page, firstTime = true, clock = false) {
   // Angemeldet wird erst nach dem Laden (samt 3D); auf langsamen Runnern dauert das
   await expect
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null), { timeout: 30_000 })
-    .toMatch(/\/spielen\/sw\.js$/);
+    .toMatch(/\/sw\.js$/);
   const sleeping = () => game.evaluate((el) => (el as unknown as GameEl).state.sleeping);
   let loads = 0;
   page.on('load', () => loads++);
@@ -87,16 +87,14 @@ const goLive = (context: BrowserContext) =>
 const cacheNames = (page: Page) => page.evaluate(() => caches.keys());
 const registration = (page: Page) =>
   page.evaluate(() =>
-    navigator.serviceWorker.getRegistration('/spielen/').then((r) => ({
+    navigator.serviceWorker.getRegistration('/').then((r) => ({
       waiting: r?.waiting?.state ?? null,
       active: r?.active?.state ?? null,
     })),
   );
 /** Wie der Browser von sich aus: nach einer neuen Version fragen */
 const askForUpdate = (page: Page) =>
-  page.evaluate(() =>
-    navigator.serviceWorker.getRegistration('/spielen/').then((r) => r?.update().then(() => undefined)),
-  );
+  page.evaluate(() => navigator.serviceWorker.getRegistration('/').then((r) => r?.update().then(() => undefined)));
 /** Größe einer Datei, wie die Seite sie bekommt (über den Service Worker), sonst minus Status */
 const fetchBytes = (page: Page, url: string) =>
   page.evaluate(

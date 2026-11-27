@@ -32,7 +32,7 @@ export default defineConfig({
     ? [['github'], ['json', { outputFile: 'test-results/report.json' }], ['html', { open: 'never' }]]
     : 'list',
   use: { baseURL: 'http://localhost:4321', trace: 'retain-on-failure' },
-  // Spiel-Tests (öffnen /spielen/) laufen mit Test-Uhr (e2e/helpers.ts) und standardmäßig in 2D: `--disable-3d-apis`
+  // Spiel-Tests (öffnen /) laufen mit Test-Uhr (e2e/helpers.ts) und standardmäßig in 2D: `--disable-3d-apis`
   // nimmt WebGL, das Spiel zeichnet wie ohne WebGL (Probe in larmic-mitwachsen.ts). Nur Tests mit Tag @3d, die das
   // Zeichnen in 3D prüfen, laufen zusätzlich im Projekt `3d` mit (Software-)WebGL, einzeln und in kleinerem Fenster
   projects: [

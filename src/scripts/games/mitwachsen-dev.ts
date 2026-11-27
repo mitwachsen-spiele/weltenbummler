@@ -1,5 +1,5 @@
 // Entwickler-Schalter – rein, ohne DOM: Was das Kind noch nicht erreichen kann, schon einmal ansehen („Blick hinein“).
-// Er hängt nur an der Adresse der Spielseite (`/spielen/?entwickler=hoehle`), nie am Spielstand und nie am Menü: Das Kind
+// Er hängt nur an der Adresse der Spielseite (`/?entwickler=hoehle`), nie am Spielstand und nie am Menü: Das Kind
 // findet ihn nicht. Mit ihm holt die Seite die genannten Pakete (mehrere mit Komma: `?entwickler=hoehle,bahn`), die
 // Figur wacht im Bett der ersten genannten Welt auf (die Bahn hat keine: dann im Bett der Lichtung), und es wird nichts
 // gespeichert, auch nicht über das Menü (`sandbox`; der Spielstand des Kindes bleibt, wie er war; nach dem Neuladen ohne

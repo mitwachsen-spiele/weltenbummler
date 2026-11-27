@@ -37,7 +37,7 @@ Beide Schriften sind über `@fontsource` lokal gebündelt.
 
 ## Bewegung
 
-Animationen nutzen meist `steps()` für den Pixel-Look. Auf den Seiten bewegen sich nur die Wolken und die Insel auf der Startseite (schwebt in vier Stufen auf und ab). Bei `prefers-reduced-motion` sind alle Animationen aus, auch im Spiel.
+Animationen nutzen meist `steps()` für den Pixel-Look. Auf den Seiten außerhalb des Spiels bewegen sich nur die Wolken. Bei `prefers-reduced-motion` sind alle Animationen aus, auch im Spiel.
 
 ## Icons
 
@@ -49,4 +49,4 @@ Die Blöcke der Seiten entstehen beim Build als SVG (`src/lib/voxel/`).
 
 - **Projektion:** dimetrisch 2:1. Block (i, j, k) liegt bei X = (i − j)·40, Y = (i + j)·20 − k·44,8. Ein Würfel ist ein `<symbol>` mit `viewBox="0 0 80 84.8"` (`blocks.ts`, `cube.ts`).
 - **Texturen:** 8×8 Pixel pro Fläche, definiert als Textraster in `textures.ts`. Schattierung: oben 5 % weiß, links 8 % schwarz, rechts 26 % schwarz. Das Spiel nutzt dieselben Texturen in seiner Ansicht von vorn und in 3D.
-- **Szenen:** `ISLAND` in `blocks.ts` ist die schwebende Insel mit Baum, Pilz und Brett: groß im Kopf der Startseite und im Vorschaubild (`og.png`). `tower(n)` stapelt n Blöcke (Erde, oben Gras) für die Altersstufen auf der Startseite. `sceneSvg` sortiert die Blöcke von hinten nach vorn und berechnet die viewBox.
+- **Szenen:** `ISLAND` in `blocks.ts` ist die schwebende Insel mit Baum, Pilz und Brett: im Vorschaubild (`og.png`); groß im Kopf der Homepage (Repo `website`). `tower(n)` stapelt n Blöcke (Erde, oben Gras) für die Altersstufen auf der Startseite. `sceneSvg` sortiert die Blöcke von hinten nach vorn und berechnet die viewBox.

@@ -18,7 +18,7 @@ describe('Das Spiel als App', () => {
     expect(APP.startUrl).toBe(SERVICE_WORKER.entry);
     expect(APP.startUrl.startsWith(APP.scope)).toBe(true);
     expect(SERVICE_WORKER.url.startsWith(SERVICE_WORKER.scope)).toBe(true);
-    expect(SERVICE_WORKER.scope).toBe('/spielen/');
+    expect(SERVICE_WORKER.scope).toBe('/');
   });
 
   it('hat Icons in 192 und 512, auch mit Maske; deren Würfel bleibt in der sicheren Zone', () => {

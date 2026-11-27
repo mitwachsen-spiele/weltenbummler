@@ -105,7 +105,7 @@ export default defineConfig(
             'Nicht auf eine Zahl von Bildern warten: Bilder zeichnet `render`, Takte spielt `ticks` (e2e/helpers.ts).',
         },
         {
-          selector: "CallExpression[callee.property.name='goto'][arguments.0.value=/^\\/spielen\\//]",
+          selector: "CallExpression[callee.property.name='goto'][arguments.0.value=/^\\/(\\?|$)/]",
           message:
             'Das Spiel nur über e2e/helpers.ts öffnen: `openGame` (wartet, bis es steht), `gotoGame` nur fürs Laden.',
         },

@@ -10,6 +10,7 @@
 // und das Blinzeln zurück dunkelt das Bild kurz ab (`--mw-blink`); beides setzt die 3D-Ansicht (mitwachsen-turn-3d.ts).
 // Logik: src/scripts/games/ · Konzept: docs/games/mitwachsen.md
 import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
+import { HOME_URL } from '../data/site';
 ---
 
 <larmic-mitwachsen class="mw">
@@ -150,7 +151,7 @@ import MitwachsenParentInfo from './MitwachsenParentInfo.astro';
       <button type="button" class="pxbtn small" data-act="close">
         Weiterspielen
       </button>
-      <a class="mw-link" href="/">
+      <a class="mw-link" href={HOME_URL}>
         Zur Startseite
       </a>
     </div>

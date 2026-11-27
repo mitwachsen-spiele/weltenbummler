@@ -10,7 +10,7 @@
 // (aus dem Paket der Bahn) und die Figur schieben den Rollstein in drei Stößen in seine Nische (`rules.ritual`,
 // mitwachsen-heave.ts; Bild und Ton in mitwachsen-heave-look.ts). Das Spiel holt dieses Paket, sobald die Figur dem
 // Höhlentor nah ist oder vor einem Halt des Zugs steht (`needsPack`, `preloadOf`); der Entwickler-Schalter holt es auch
-// so (`/spielen/?entwickler=hoehle`, mit der Bahn auch `?entwickler=bahn`, mitwachsen-dev.ts). Nichts außerhalb dieses Ordners importiert statisch von hier
+// so (`/?entwickler=hoehle`, mit der Bahn auch `?entwickler=bahn`, mitwachsen-dev.ts). Nichts außerhalb dieses Ordners importiert statisch von hier
 // (geprüft durch `npm run arch`): im Build `_astro/welt-hoehle.<hash>.js` (Name aus astro.config.mjs), gemessen mit
 // eigener Grenze (scripts/verify-bundles.ts). Sein 3D-Teil (view-3d.ts) kommt erst, wenn die 3D-Ansicht ihn will
 // (`view3d`): `_astro/welt-hoehle-3d.<hash>.js`, ebenfalls mit eigener Grenze.

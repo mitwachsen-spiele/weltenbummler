@@ -1,4 +1,2 @@
 User-agent: *
 Allow: /
-
-Sitemap: https://www.mitwachsen-spiele.de/sitemap-index.xml

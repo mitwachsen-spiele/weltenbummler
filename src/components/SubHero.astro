@@ -6,7 +6,7 @@ import Clouds from './Clouds.astro';
 interface Props {
   title: string;
   lead?: string;
-  back?: boolean; // Zurück-Button zur Startseite
+  back?: boolean; // Zurück-Button zum Spiel
 }
 const { title, lead, back = true } = Astro.props;
 ---
@@ -21,7 +21,7 @@ const { title, lead, back = true } = Astro.props;
           <svg width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">
             <path d="M2 3h1v2h-1z M3 2h1v4h-1z M4 1h1v6h-1z" fill="currentColor" />
           </svg>
-          Zur Startseite
+          Zum Spiel
         </a>
       )}
       <h1>{title}</h1>
