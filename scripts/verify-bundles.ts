@@ -26,8 +26,8 @@ export const RULES: Rule[] = [
     name: 'Spiel lädt 3D erst bei Bedarf',
     pages: /^index\.html$/,
     // Kern: Regeln, Welt, 2D-Ansicht und Daten des Spiels; 3D (Three.js) und die Welt-Pakete kommen erst per import().
-    // Gemessen 172,0 KB (mit den Dingen der Welt aus einer Quelle für 2D und 3D: deco-look, tree-look, row)
-    budget: 189.2 * 1024,
+    // Gemessen 184,9 KB (mit feinen Flächen: Muster, Maler, Bild-Cache und Leuchten laufen im Kern)
+    budget: 203.4 * 1024,
     // Probe: Der Höhlenhimmel der Grotte steht nur in ihrem Welt-Paket (GROTTE_COLORS.sky)
     forbidden: /WebGLRenderer|three\.module|#4a4370/,
   },

@@ -9,7 +9,10 @@ import {
   box,
   drawModel,
   frontBlock,
+  paintWith,
   projection,
+  type Dir,
+  type Part,
   type Projection,
 } from '../../lib/games/front';
 import {
@@ -70,6 +73,8 @@ import { hangAt, labelHeight } from './mitwachsen-roost';
 import { isRing } from './mitwachsen-rim';
 import { PAL_RING, rimBlossoms } from './mitwachsen-rim-look';
 import { workOf } from './mitwachsen-herald';
+import { Fine2D, Sprites, boxesExtent, contactShadow, edgeShade, modelExtent } from './mitwachsen-fine-2d';
+import { HaloPass, type HaloLit, type HaloView } from './mitwachsen-halo';
 
 /** Gleitende Position eines Wesens auf dem Bildschirm (in Feldern), dazu Hüpfer und Blickrichtung */
 export type Body = { x: number; y: number; z: number; hop: number; puff?: number }; // puff: Haltung im Iglu (Größe)
@@ -115,11 +120,28 @@ export type Scene = {
 
 /** Rahmen des Betts aus Holz (das Schneebett der Eis-Welt ist aus Schnee: `BED_SNOW`) */
 const BED_FRAME: readonly [string, string] = [GAME_COLORS.bed.frame, GAME_COLORS.bed.frame];
-/** Schatten unter Dingen in 2D: Mitte (Felder nach vorn) und Radius */
+/** Weicher Fleck unter Dingen in 2D: Mitte (Felder nach vorn) und Halbbreite des Fußes */
 const SHADOW: Partial<Record<Deco, readonly [number, number]>> = {
-  tree: [0.6, 0.7],
-  bush: [0.55, 0.42],
-  boulder: [0.55, 0.4],
+  tree: [0.55, 0.45],
+  bush: [0.55, 0.36],
+  boulder: [0.55, 0.32],
+};
+/** Anstieg des Blicks je Feld nach vorn in 2D (für die Verdeckung der Leuchten): Tiefe einer Reihe in Ebenen */
+const RISE_2D = TILE_D / LEVEL_H;
+
+/** Dunst am Rand des Erkundeten auf Feld (x, y): je mehr Nebel ringsum (5 × 5), desto dichter (0 … 0,85) */
+function hazeAt(sc: Pick<Scene, 'explored'>, x: number, y: number): number {
+  let fog = 0;
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (!sc.explored(x + dx, y + dy)) fog++;
+  return Math.min(0.85, fog / 14);
+}
+/** Kennungen der festen Teilelisten (Tiere, Haltungen) für den Bild-Cache; die Figur wird nach ihrem Inhalt erkannt */
+const PART_IDS = new WeakMap<readonly Part[], string>();
+let partCount = 0;
+const partsId = (parts: readonly Part[]) => {
+  let id = PART_IDS.get(parts);
+  if (!id) PART_IDS.set(parts, (id = `m${partCount++}`));
+  return id;
 };
 
 /**
@@ -138,6 +160,10 @@ const facing = (state: State, sc: Scene) => (sc.pose === 'stand' ? state.player.
 const PAL_SAND: Palette = { D: [['#e3cf95', 1]], d: [['#d4bd7d', 1]], e: [['#efdeaa', 1]] };
 const PAL_PATH: Palette = { D: [['#c9a46e', 1]], d: [['#b48d58', 1]], e: [['#d8b783', 1]] };
 
+/** Höhe der Oberseite eines Felds für den weichen Schatten am Boden; null, wo kein Boden ist (Wasser, Lava, Himmel) */
+const heightOrNull = (c: Cell): number | null =>
+  c.ground === 'water' || c.ground === 'lava' || c.ground === 'sky' ? null : c.h;
+
 export class Renderer {
   /** Quader der Welt-Pakete im Bild (Iglu, Eisschale, Trog, Kristallwand): jeder kommt in der Reihe seiner Vorderkante dran */
   private later: Box[] = [];
@@ -147,6 +173,9 @@ export class Renderer {
   private album = new Album(); // Leiste unten
   private roof = 1; // Deckkraft der Dächer am Zuhause in diesem Bild (`openRoof`)
   private things = rowCache(); // Quader der Dinge je Feld, geklemmt und sortiert (nicht jedes Bild neu)
+  private fine = new Fine2D(); // Muster und Verlauf der Dinge, sammelt das Leuchten
+  private sprites = new Sprites(); // Dinge und Modelle als Bild je Maßstab (mitwachsen-fine-2d.ts)
+  private halos = new HaloPass(); // Leuchten über allem (mitwachsen-halo.ts)
   private guest: Guest | null = null; // der Pinguin am Tor, solange er führt (Umriss, goldene Torplatte; nachgeladen)
   private blocks: Record<'grass' | 'dirt' | 'stone' | 'ring' | 'sand' | 'path' | 'leaves' | 'log', HTMLCanvasElement>;
 
@@ -193,17 +222,19 @@ export class Renderer {
 
     this.later = [];
     this.at = { now: sc.now, reduced: sc.reduced, picked: state.picked, packs: state.packs, work: workOf(state) };
+    paintWith(ctx, this.fine); // Dinge fein; Gelände, Böden und Torhäuser zeichnen ausdrücklich flach
+    this.sprites.begin(ctx, world);
     this.roof = 1 - (1 - ROOF_LEFT) * openRoof(world, state.player.x, state.player.y).open;
     this.guest = this.guestAt(world, state);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
-      for (const b of marks.get(y) ?? []) if (sc.explored(Math.floor(b[0]), y)) drawBox(ctx, P, b);
+      for (const b of marks.get(y) ?? []) if (sc.explored(Math.floor(b[0]), y)) drawBox(ctx, P, b, null);
       for (const v of this.views.values()) v.trail?.draw(ctx, world, P, y); // Fußspuren im Schnee (aus dem Welt-Paket)
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
       for (const b of this.later)
         if (Math.ceil(b[1] + b[4] - 1e-6) - 1 === y) {
           ctx.globalAlpha = b[8] === 'see' ? this.roof : 1; // Dach am Zuhause durchscheinend (`openRoof`)
-          drawBox(ctx, P, b);
+          drawBox(ctx, P, b, b[8] === 'sway' || b[8] === 'glow' ? null : undefined); // Leuchtschrift, Lichtpunkte: scharf
           ctx.globalAlpha = 1;
         }
       for (const r of rides.get(y) ?? []) this.ride(P, sc, r);
@@ -211,8 +242,9 @@ export class Renderer {
       for (const id of ids) {
         const b = sc.bodies.get(id)!;
         if (id === 'player') {
-          this.shadow(P, b.x + 0.5, b.y + 0.5, b.z, 0.32);
-          drawModel(ctx, P, figure(state, sc, world), b.x + 0.5, b.y + 0.5, b.z + b.hop, facing(state, sc), 1);
+          contactShadow(ctx, P, b.x + 0.5, b.y + 0.5, b.z, 0.3, b.hop, sc.reduced);
+          const me = figure(state, sc, world);
+          this.model(P, me, JSON.stringify(me), b, facing(state, sc), 1);
           continue;
         }
         const a = byId.get(id);
@@ -221,10 +253,9 @@ export class Renderer {
         const scale = sp.scale * (b.puff ?? 1);
         const perch = hangAt(a, world.cell(a.x, a.y)); // hängt kopfüber an seinem Sitzplatz (Fledermaus im Bogen)
         if (perch !== undefined && sc.away(a.x, a.y)) continue; // gerade auf ihrer Runde (Bild des Welt-Pakets)
-        this.shadow(P, b.x + 0.5, b.y + 0.5, b.z, 0.26 * scale);
-        if (perch !== undefined && sp.roost)
-          drawModel(ctx, P, sp.roost, b.x + 0.5, b.y + 0.5, b.z + perch, a.dir, scale);
-        else drawModel(ctx, P, (a.solo && sp.solo) || sp.parts, b.x + 0.5, b.y + 0.5, b.z + b.hop, a.dir, scale);
+        contactShadow(ctx, P, b.x + 0.5, b.y + 0.5, b.z, 0.24 * scale, perch === undefined ? b.hop : 0, sc.reduced);
+        const parts = perch !== undefined && sp.roost ? sp.roost : (a.solo && sp.solo) || sp.parts;
+        this.model(P, parts, partsId(parts), perch !== undefined && sp.roost ? { ...b, hop: perch } : b, a.dir, scale);
       }
     }
 
@@ -232,18 +263,44 @@ export class Renderer {
     const me = sc.bodies.get('player');
     if (me && !state.sleeping && !state.ride) {
       ctx.globalAlpha = 0.35;
-      drawModel(ctx, P, figure(state, sc, world), me.x + 0.5, me.y + 0.5, me.z + me.hop, facing(state, sc), 1);
+      const parts = figure(state, sc, world);
+      this.model(P, parts, JSON.stringify(parts), me, facing(state, sc), 1, false); // ihre Leuchten zählen schon
       ctx.globalAlpha = 1;
     }
+    paintWith(ctx, null);
 
     this.atmosphere(sc);
-    this.overlay(world, state, sc, P);
+    this.overlay(world, state, sc, P, this.fine.take());
+  }
+
+  /** Ein Modell (Figur, Tier) aus dem Bild-Cache: je Teile, Richtung und Größe einmal fein gezeichnet */
+  private model(P: Projection, parts: readonly Part[], id: string, b: Body, dir: Dir, scale: number, glow = true) {
+    const key = `${id}|${dir}|${scale.toFixed(3)}`;
+    const at = [b.x + 0.5, b.y + 0.5, b.z + b.hop] as const;
+    this.sprites.draw(
+      this.ctx,
+      P,
+      key,
+      at,
+      modelExtent(parts, scale),
+      (c, Q) => {
+        drawModel(c, Q, parts, at[0], at[1], at[2], dir, scale);
+      },
+      glow ? this.fine : null,
+    );
+  }
+
+  /** Etwas, das Block bleibt (Torhaus, Portal, Torplatte), ohne den Maler der Dinge zeichnen */
+  private flat(draw: () => void) {
+    paintWith(this.ctx, null);
+    draw();
+    paintWith(this.ctx, this.fine);
   }
 
   /** Ein Körper eines Fahrzeugs (im Nebel verborgen wie die Tiere) */
   private ride(P: Projection, sc: Scene, r: RideBody) {
     if (!sc.explored(Math.round(r.x), Math.round(r.y))) return;
-    this.shadow(P, r.x + 0.5, r.y + 0.5, r.z, 0.3);
+    contactShadow(this.ctx, P, r.x + 0.5, r.y + 0.5, r.z, 0.3, 0, sc.reduced);
     drawRide(this.ctx, P, r);
   }
 
@@ -252,7 +309,7 @@ export class Renderer {
    * Luft und die Leiste. Gleich für beide Ansichten; die 3D-Ansicht reicht ihre eigene Projektion herein und zeichnet
    * diese Ebene auf ein durchsichtiges Canvas über der 3D-Welt.
    */
-  overlay(world: World, state: State, sc: Scene, P: Projection) {
+  overlay(world: World, state: State, sc: Scene, P: Projection, halos: readonly HaloLit[] = [], view?: HaloView) {
     const { ctx } = this;
     const z = sc.zoom;
     const followers = new Set(state.followers);
@@ -292,6 +349,16 @@ export class Renderer {
     moodLife(ctx, sc);
     if (sc.night > 0) this.nightSky(sc);
     if (sc.aurora > 0) ice?.aurora(ctx, sc, P);
+    // Leuchten kompakter Teile: nach Maske und Nacht, nur Erkundetes, gedämpft hinter Hügeln und Kronen
+    const me = sc.bodies.get('player');
+    const focus = [(me?.x ?? sc.cam.x) + 0.5, (me?.y ?? sc.cam.y) + 0.5] as const;
+    this.halos.draw(ctx, P, halos, {
+      explored: sc.explored,
+      night: sc.night,
+      focus,
+      cell: world.cell.bind(world),
+      view: view ?? { rise: RISE_2D, to: [0, 1], seen: (x, y) => 1 - hazeAt(sc, x, y) }, // 2D: von vorn, Dunst wie `haze`
+    });
     this.life(sc);
     this.album.draw(ctx, state, sc, world.realm(state.player.x, state.player.y), ice);
   }
@@ -347,14 +414,16 @@ export class Renderer {
     if (!sc.explored(x, y)) return; // im Nebel: nichts, der Himmel scheint durch
     if (c.ground === 'water') return this.water(P, world, x, y, sc);
     if (c.ground === 'sky') return; // zwischen den Wolken: nur Himmel
-    if (c.ground === 'lava') return box(this.ctx, P, x, y, 0, 1, 1, 0.6, '#b8380a', '#ff7a1a');
+    if (c.ground === 'lava') return box(this.ctx, P, x, y, 0, 1, 1, 0.6, '#b8380a', '#ff7a1a', undefined, null);
     const flat = flatColors(c);
     if (flat) {
       // Böden der Welten hinter den Toren: einfache Blöcke in ihren Farben
       const frontH = world.cell(x, y + 1).h;
-      for (let k = Math.max(0, Math.min(c.h - 1, frontH)); k < c.h; k++) box(this.ctx, P, x, y, k, 1, 1, 1, ...flat);
+      for (let k = Math.max(0, Math.min(c.h - 1, frontH)); k < c.h; k++)
+        box(this.ctx, P, x, y, k, 1, 1, 1, ...flat, undefined, null);
       // Rutschspur zum Schneebett (aus dem Welt-Paket): flach im Boden, unter Kanten und Nebelrand
-      if (c.biome) drawBox(this.ctx, P, this.views.get(c.biome)?.ground(c, x, y, sc.gates.has(c.biome), sc.evening));
+      if (c.biome)
+        drawBox(this.ctx, P, this.views.get(c.biome)?.ground(c, x, y, sc.gates.has(c.biome), sc.evening), null);
       this.edges(P, world, x, y, c.h);
       this.plate(P, world, c, x, y, sc);
       return this.haze(P, x, y, c.h, sc);
@@ -380,7 +449,7 @@ export class Renderer {
     this.edges(P, world, x, y, c.h);
     if (c.rim)
       for (const [bx, by, bz, w, d, bh, color] of rimBlossoms(x, y, c.h))
-        box(this.ctx, P, bx, by, bz, w, d, bh, color, color);
+        box(this.ctx, P, bx, by, bz, w, d, bh, color, color, undefined, null);
     if (c.tint && c.ground === 'grass') {
       // Stimmung der Richtung: Gras tönen (multiplizieren, damit die Körnung bleibt)
       const [ax, ay] = P(x, y, c.h);
@@ -411,7 +480,7 @@ export class Renderer {
       const look = this.views.get(c.plate)?.plate; // Schmuck aus dem Paket der Welt dahinter (Eis-Welt: Scholle)
       // goldener Rand, solange der Pinguin zu diesem Tor führt (aus dem Paket)
       const gold = this.guest?.rim(c.plate, sc.now, sc.reduced);
-      drawPlate(this.ctx, P, world, c.plate, x, y, c.h, sc.plate, sc.now, sc.reduced, look, gold);
+      this.flat(() => drawPlate(this.ctx, P, world, c.plate!, x, y, c.h, sc.plate, sc.now, sc.reduced, look, gold));
     }
   }
 
@@ -446,6 +515,8 @@ export class Renderer {
         rect(line);
       }
     }
+    // weicher Schatten neben höheren Blöcken (Entwurf „Feine Grafik“), zusätzlich zu den Kanten
+    edgeShade(ctx, P, (nx, ny) => heightOrNull(world.cell(nx, ny)), x, y);
     if (height(x, y + 1) < h) {
       ctx.fillStyle = GAME_COLORS.highlight;
       ctx.fillRect(ax, by - line, w, line);
@@ -486,17 +557,6 @@ export class Renderer {
     }
   }
 
-  /** Weicher Schatten auf dem Boden unter einem Wesen oder Gegenstand */
-  private shadow(P: Projection, cx: number, cy: number, z: number, r: number) {
-    const [sx, sy] = P(cx, cy, z);
-    const [ex] = P(cx + r, cy, z);
-    const rx = ex - sx;
-    this.ctx.fillStyle = 'rgba(20,30,20,.22)';
-    this.ctx.beginPath();
-    this.ctx.ellipse(sx, sy, rx, rx * 0.42, 0, 0, Math.PI * 2);
-    this.ctx.fill();
-  }
-
   /** Grasbüschel: je drei schmale Halme in verschiedenen Grüntönen */
   private tufts(P: Projection, x: number, y: number, h: number, n: number) {
     const greens = ['#3a7f2c', '#4f9a3c', '#6dbd47', '#2f6f28'];
@@ -506,7 +566,8 @@ export class Renderer {
         ty = y + 0.15 + ((r >>> 8) % 65) / 100;
       for (let b = 0; b < 3; b++) {
         const bh = 0.2 + ((r >>> (12 + b * 3)) % 7) / 36;
-        box(this.ctx, P, tx + b * 0.055, ty + (b === 1 ? -0.02 : 0), h, 0.045, 0.02, bh, cycle(greens, r + b));
+        const g = cycle(greens, r + b);
+        box(this.ctx, P, tx + b * 0.055, ty + (b === 1 ? -0.02 : 0), h, 0.045, 0.02, bh, g, undefined, undefined, null);
       }
     }
   }
@@ -584,13 +645,12 @@ export class Renderer {
 
   /** Weicher Dunst am Rand des Erkundeten: je mehr Nebel ringsum, desto heller */
   private haze(P: Projection, x: number, y: number, h: number, sc: Scene) {
-    let fog = 0;
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (!sc.explored(x + dx, y + dy)) fog++;
-    if (!fog) return;
+    const veil = hazeAt(sc, x, y);
+    if (!veil) return;
     const [ax, ay] = P(x, y, h);
     const [bx, by] = P(x + 1, y + 1, h);
     const [, cy] = P(x, y + 1, Math.max(0, h - 2));
-    this.ctx.fillStyle = `rgba(214,234,246,${Math.min(0.85, fog / 14).toFixed(2)})`;
+    this.ctx.fillStyle = `rgba(214,234,246,${veil.toFixed(2)})`;
     this.ctx.fillRect(ax, ay, bx - ax, Math.max(by, cy) - ay);
   }
 
@@ -616,27 +676,41 @@ export class Renderer {
     });
     if (things) {
       const under = c.deco ? SHADOW[c.deco] : undefined;
-      if (under) this.shadow(P, x + 0.5, y + under[0], h, under[1]);
-      // der Hut am Unterstand ist durchscheinend, solange die Figur zu Hause ist (`openRoof`)
-      const roofed = c.deco === 'shelterpilz';
-      for (const b of things) {
-        ctx.globalAlpha = roofed && b[8] === 'see' ? this.roof : 1;
-        drawBox(ctx, P, b);
+      if (under) contactShadow(ctx, P, x + 0.5, y + under[0], h, under[1]);
+      // der Hut am Unterstand ist durchscheinend, solange die Figur zu Hause ist (`openRoof`): Quader einzeln
+      if (c.deco === 'shelterpilz') {
+        for (const b of things) {
+          ctx.globalAlpha = b[8] === 'see' ? this.roof : 1;
+          drawBox(ctx, P, b);
+        }
+        ctx.globalAlpha = 1;
+        return;
       }
-      ctx.globalAlpha = 1;
+      const at = [x + 0.5, y + 0.5, h] as const; // alles andere als Bild, je Feld und Ding einmal gezeichnet
+      this.sprites.draw(
+        ctx,
+        P,
+        `${x},${y}|${key}`,
+        at,
+        boxesExtent(things, at),
+        (cc, Q) => {
+          for (const b of things) drawBox(cc, Q, b);
+        },
+        this.fine,
+      );
       return;
     }
     switch (c.deco) {
       case 'biggate': // Torhaus: Tür (je nach Öffnung), Türme, Torbogen; führt der Pinguin hierher, sein Umriss
       case 'gatetower':
-        bigGate(ctx, P, world, c, x, y, h, sc.gates, this.guest);
+        this.flat(() => bigGate(ctx, P, world, c, x, y, h, sc.gates, this.guest));
         break;
       case 'portal':
       case 'portalrim':
-        drawPlatform(ctx, P, world, state, x, y, h, c.portal!);
+        this.flat(() => drawPlatform(ctx, P, world, state, x, y, h, c.portal!));
         break;
       case 'klangstein':
-        drawStone(ctx, P, x, y, h, heardStone(state, c.story!), sc.now, sc.reduced);
+        this.flat(() => drawStone(ctx, P, x, y, h, heardStone(state, c.story!), sc.now, sc.reduced)); // wie in 3D noch Block
         break;
       case 'gate':
         for (const b of clampRow(fenceBoxes(world, x, y, h, 1 - (sc.gates.get(c.gate!) ?? 0)), y)) drawBox(ctx, P, b);

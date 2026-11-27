@@ -4,7 +4,7 @@
 // einfacher Block in Kartenfarbe. Gleich für 2D und die Ebene über 3D (dort nur Wetter und Leiste).
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
-import { box, type Fine, type Projection } from '../../lib/games/front';
+import { box, type Fine, type FinePainter, type Projection } from '../../lib/games/front';
 import type { GateId, RegionId, SpeciesId } from '../../data/games/mitwachsen';
 import type { HeraldEvent } from './mitwachsen-herald';
 import type { Deco } from './mitwachsen-cell';
@@ -49,9 +49,17 @@ export const packScore = (views: Iterable<View2D>, e: PackEvent): Scored[] =>
 export const awayIn = (views: Iterable<View2D>, x: number, y: number, now: number) =>
   [...views].some((v) => v.away?.(x, y, now) ?? false);
 
-/** Einen Quader von vorn zeichnen (nichts, wenn keiner da ist) */
-export function drawBox(ctx: CanvasRenderingContext2D, P: Projection, b: Box | null | undefined) {
-  if (b) box(ctx, P, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[9]);
+/**
+ * Einen Quader von vorn zeichnen (nichts, wenn keiner da ist); `painter` wie bei `box` (undefined: der Maler des
+ * Kontexts, null: flach, etwa Böden)
+ */
+export function drawBox(
+  ctx: CanvasRenderingContext2D,
+  P: Projection,
+  b: Box | null | undefined,
+  painter?: FinePainter | null,
+) {
+  if (b) box(ctx, P, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[9], painter);
 }
 
 /**

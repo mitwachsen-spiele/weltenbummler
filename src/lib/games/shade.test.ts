@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CONTACT_KNEE,
+  CONTACT_MID,
   EDGE_AO,
   HALO_HYST,
   HALO_LIMIT,
   contactAlpha,
+  contactFall,
   contactRadius,
   cornerShade,
   edgeAlpha,
@@ -127,6 +130,15 @@ describe('Weicher Fleck unter Körpern', () => {
     const steps = new Set(lifts.map((l) => contactRadius(0.3, l, true).toFixed(6)));
     expect(steps.size).toBe(3);
     expect(new Set(lifts.map((l) => contactAlpha(l, true).toFixed(6))).size).toBe(3);
+  });
+  it('bleibt bis zum Knick kräftig und fällt dann weich auf 0 am Rand', () => {
+    expect(contactFall(0)).toBe(1);
+    expect(contactFall(-0.2)).toBe(1); // innen nie mehr als die Mitte
+    expect(contactFall(CONTACT_KNEE)).toBeCloseTo(CONTACT_MID);
+    expect(contactFall(1)).toBe(0);
+    expect(contactFall(1.5)).toBe(0);
+    const r = Array.from({ length: 101 }, (_, i) => contactFall(i / 100));
+    expect(r.every((v, i) => i === 0 || v <= r[i - 1]!)).toBe(true); // nach außen nie heller
   });
 });
 

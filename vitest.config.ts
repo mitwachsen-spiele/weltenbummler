@@ -67,7 +67,7 @@ export default defineConfig({
         'src/lib/**/*.ts',
         'src/data/games/**/*.ts',
         'src/scripts/games/{input-pace,pwa-update}.ts',
-        'src/scripts/games/mitwachsen-{air,bedtime,behind,border,camera,chores,deco-look,dev,dusk,fog,free,gait,growth,guide,herald,hint-look,home,meadow,pack,packs,plate,plate-toy,portal,postcard,preload,ride-kit,ride-save,ride-view,row,save,scatter,spawns,state,tired,travel,tree-look,turn,turn-pace,view,view-3d,weather,wild,world}.ts',
+        'src/scripts/games/mitwachsen-{air,bedtime,behind,border,camera,chores,deco-look,dev,dusk,fine-2d,fine-3d,fine-bodies-3d,fine-chunk-3d,fog,free,gait,growth,guide,halo,herald,hint-look,home,meadow,pack,packs,plate,plate-toy,portal,postcard,preload,ride-kit,ride-save,ride-view,row,save,scatter,spawns,state,tired,travel,tree-look,turn,turn-pace,view,view-3d,weather,wild,world}.ts',
         'src/scripts/games/worlds/*/*.ts',
         'scripts/{bundles,dist,flaky,pwa,test-budget}.ts',
       ],

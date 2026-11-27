@@ -89,6 +89,15 @@ export const contactRadius = (footprint: number, lift = 0, reduced = false): num
   footprint * 1.35 * (1 - 0.35 * liftOf(lift, reduced));
 /** Deckkraft in der Mitte des Flecks: Er wird beim Hüpfen blasser */
 export const contactAlpha = (lift = 0, reduced = false): number => 0.32 * (1 - 0.5 * liftOf(lift, reduced));
+/** Knick des Flecks: bis hierhin (Anteil des Radius) bleibt er kräftig, dort hat er noch `CONTACT_MID` der Mitte */
+export const CONTACT_KNEE = 0.45;
+export const CONTACT_MID = 0.75;
+/** Deckkraft des Flecks über den Radius (0 Mitte … 1 Rand) als Anteil der Mitte: erst sanft, dann weich auf 0 */
+export function contactFall(r: number): number {
+  if (r >= 1) return 0;
+  const t = Math.max(0, r);
+  return t < CONTACT_KNEE ? 1 - (1 - CONTACT_MID) * (t / CONTACT_KNEE) : (CONTACT_MID * (1 - t)) / (1 - CONTACT_KNEE);
+}
 
 // ---------- Weicher Schatten am Boden neben Höherem ----------
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Matrix4, Vector3 } from 'three';
-import { snapToShadowTexel } from './mitwachsen-geo';
+import { Color, Matrix4, Vector3 } from 'three';
+import { edgeAlpha, vertexShade } from '../../lib/games/shade';
+import { SKINS, SKIN_PERIOD } from '../../lib/games/skins';
+import { Geo, snapToShadowTexel, topCorners } from './mitwachsen-geo';
 
 describe('Schatten rasten ein', () => {
   const offset = new Vector3(-9, 22, 7);
@@ -47,5 +49,93 @@ describe('Schatten rasten ein', () => {
       const across = (v: Vector3) => [v.dot(ax(0)), v.dot(ax(1))].map((c) => Math.round(c / texel));
       expect(across(near)).toEqual(across(s));
     }
+  });
+});
+
+describe('Baukasten: feine Dinge', () => {
+  /** Werte eines Merkmals je Ecke */
+  const rows = (g: Geo, name: string) => {
+    const a = g.build().getAttribute(name);
+    return Array.from({ length: a.count }, (_, i) =>
+      Array.from({ length: a.itemSize }, (_, k) => +a.getComponent(i, k).toFixed(4)),
+    );
+  };
+
+  it('Gelände bleibt, wie es ist: ohne Feinheit keine zusätzlichen Merkmale, eine Farbe je Fläche', () => {
+    const g = new Geo();
+    g.quad([0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0], [0, 1, 0], 'grassTop', new Color('#808080'));
+    g.box(0, 0, 0, 1, 1, 1, '#808080');
+    const built = g.build();
+    expect(built.getAttribute('aFine')).toBeUndefined();
+    expect(built.getAttribute('aSkin')).toBeUndefined();
+    expect(new Set(rows(g, 'color').map((c) => c.join())).size).toBe(1);
+  });
+
+  it('dunkelt Ecken einer Fläche einzeln ab (weicher Schatten am Boden), die Kachel bleibt', () => {
+    const plain = new Geo(),
+      shaded = new Geo();
+    const quad = (g: Geo, k?: readonly [number, number, number, number]) =>
+      g.quad([0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0], [0, 1, 0], 'grassTop', new Color(1, 1, 1), k);
+    quad(plain);
+    quad(shaded, [1, 0.7, 1, 0.865]);
+    expect(rows(shaded, 'uv')).toEqual(rows(plain, 'uv'));
+    expect(rows(shaded, 'color').map((c) => c[0])).toEqual([1, 0.7, 1, 0.865]);
+    expect(topCorners({ x0y0: 1, x1y0: 2, x1y1: 3, x0y1: 4 })).toEqual([4, 3, 2, 1]);
+  });
+
+  it('gibt einem feinen Quader Seitenverlauf, Oberseite hinten heller, Muster und Kante nur oben', () => {
+    const g = new Geo();
+    g.box(0, 0, 0, 0.5, 0.75, 0.25, '#ffffff', null, 'white', undefined, { skin: 'holz' });
+    const color = rows(g, 'color').map((c) => c[0]!);
+    const v = vertexShade();
+    // Oberseite: vorn, vorn, hinten, hinten; dann vier Seiten: unten, unten, oben, oben
+    expect(color.slice(0, 4)).toEqual([v.topFront, v.topFront, v.topBack, v.topBack].map((x) => +x.toFixed(4)));
+    expect(color.slice(4, 8)).toEqual([v.sideBottom, v.sideBottom, v.sideTop, v.sideTop].map((x) => +x.toFixed(4)));
+    const skin = rows(g, 'aSkin');
+    const holz = SKINS.indexOf('holz') + 1;
+    expect(skin[0]).toEqual([holz, edgeAlpha(), +(1 / SKIN_PERIOD.holz).toFixed(4)]); // oben mit Kante
+    expect(skin[4]).toEqual([holz, 0, +(1 / SKIN_PERIOD.holz).toFixed(4)]); // Seite ohne Kante
+    // Lage in der Fläche (Felder) und ihre Größe: oben 0,5 × 0,25, vorn 0,5 × 0,75
+    const fine = rows(g, 'aFine');
+    expect(fine.slice(0, 4)).toEqual([
+      [0, 0, 0.5, 0.25],
+      [0.5, 0, 0.5, 0.25],
+      [0.5, 0.25, 0.5, 0.25],
+      [0, 0.25, 0.5, 0.25],
+    ]);
+    expect(fine[6]).toEqual([0.5, 0.75, 0.5, 0.75]);
+  });
+
+  it('leuchtende Teile: halbe Schattierung, hellere Kante, Leuchten an der Mitte (nur kompakte)', () => {
+    const g = new Geo();
+    g.box(2, 1, 3, 0.2, 0.4, 0.2, '#ffe08a', null, 'white', undefined, { halo: true });
+    g.box(0, 0, 0, 2, 0.2, 0.2, '#ffe08a', null, 'white', undefined, { halo: true }); // langer Streifen
+    expect(g.halos).toEqual([{ x: 2.1, y: 3.1, z: 1.2, size: 0.4, color: '#ffe08a' }]);
+    const color = rows(g, 'color').map((c) => c[0]!);
+    expect(color[4]).toBeCloseTo(vertexShade(true).sideBottom, 3);
+    expect(rows(g, 'aSkin')[0]![1]).toBeCloseTo(edgeAlpha(true));
+  });
+
+  it('kleine Teile ohne Kante; Modelle in ihrer Größe (Kante und Muster wie bei voller Größe)', () => {
+    const g = new Geo();
+    g.box(0, 0, 0, 0.1, 0.1, 0.1, '#ffffff', null, 'white', undefined, {});
+    expect(rows(g, 'aSkin')[0]).toEqual([0, 0, 0]);
+    const small = new Geo();
+    small.box(0, 0, 0, 0.2, 0.2, 0.2, '#ffffff', null, 'white', undefined, { skin: 'fell' }, 0.5);
+    expect(rows(small, 'aSkin')[0]![1]).toBe(0); // 0,1 groß gezeigt: keine Kante
+    expect(rows(small, 'aFine')[1]).toEqual([0.1, 0, 0.1, 0.1]); // Fläche in gezeigter Größe
+  });
+
+  it('füllt Flächen vor dem ersten feinen Quader mit 0 auf (Gelände und Dinge in einer Geometrie)', () => {
+    const g = new Geo();
+    g.box(0, 0, 0, 1, 1, 1, '#808080');
+    g.box(0, 1, 0, 0.5, 0.5, 0.5, '#808080', null, 'white', undefined, { skin: 'fell' });
+    g.box(0, 2, 0, 1, 1, 1, '#808080');
+    const skin = rows(g, 'aSkin');
+    expect(skin).toHaveLength(60);
+    expect(skin[0]).toEqual([0, 0, 0]);
+    expect(skin[20]![0]).toBe(SKINS.indexOf('fell') + 1);
+    expect(skin[59]).toEqual([0, 0, 0]);
+    expect(rows(g, 'aFine')).toHaveLength(60);
   });
 });

@@ -14,7 +14,10 @@ import {
   type FaceRect,
   type Fine,
   type FinePainter,
+  type HaloAt,
   type Part,
+  paintWith,
+  painterOf,
 } from './front';
 
 /** Kontext, der mitschreibt, was gezeichnet wird: Füllungen und Striche samt Farbe */
@@ -41,9 +44,9 @@ function recorder() {
 /** Maler, der mitschreibt, welche Flächen und Leuchten er bekommt */
 function painter(withHalo = true) {
   const faces: [FaceRect, Fine | undefined][] = [];
-  const halos: [number, number, number, string][] = [];
+  const halos: HaloAt[] = [];
   const p: FinePainter = { face: (_ctx, f, fine) => faces.push([f, fine]) };
-  if (withHalo) p.halo = (x, y, r, c) => halos.push([x, y, r, c]);
+  if (withHalo) p.halo = (at) => halos.push(at);
   return { p, faces, halos };
 }
 
@@ -131,11 +134,10 @@ describe('Quader von vorn: flach und fein', () => {
     const { p, halos } = painter();
     box(ctx, P, 1, 1, 0, 0.2, 0.2, 0.4, '#ffe08a', null, { halo: true }, p);
     expect(halos).toHaveLength(1);
-    const [x, y, r, c] = halos[0]!;
-    const [mx, my] = P(1.1, 1.1, 0.2);
-    expect([x, y]).toEqual([mx, my]);
-    expect(r).toBeCloseTo(0.4 * TILE_W);
-    expect(c).toBe('#ffe08a');
+    const { x, y, z, size, color } = halos[0]!;
+    expect([x, y, z]).toEqual([1.1, 1.1, 0.2]); // Mitte in der Welt, die Ansicht projiziert selbst
+    expect(size).toBeCloseTo(0.4);
+    expect(color).toBe('#ffe08a');
     expect(log.find((l) => l.startsWith('stroke'))).toContain('rgba(255,255,255,0.6)'); // hellere Kante
     box(ctx, P, 0, 0, 0, 2, 0.2, 0.2, '#ffe08a', null, { halo: true }, p);
     expect(halos).toHaveLength(1);
@@ -157,6 +159,24 @@ describe('Quader von vorn: flach und fein', () => {
     drawModel(flat.ctx, P, parts, 0, 0, 0, 's', 1, '#000000', b.p);
     expect(b.faces).toEqual([]);
     expect(flat.log.filter((l) => l.includes('rgba(0,0,0,.18)'))).toHaveLength(2);
+  });
+
+  it('malt mit dem Maler des Kontexts, bis er weggenommen wird; null bleibt flach', () => {
+    const { ctx, log } = recorder();
+    const a = painter();
+    paintWith(ctx, a.p);
+    expect(painterOf(ctx)).toBe(a.p);
+    box(ctx, P, 0, 0, 0, 0.5, 0.5, 0.5, '#808080');
+    expect(a.faces).toHaveLength(2);
+    box(ctx, P, 0, 0, 0, 0.5, 0.5, 0.5, '#808080', null, undefined, null); // Gelände: flach trotz Maler
+    expect(a.faces).toHaveLength(2);
+    expect(log.filter((l) => l.includes('rgba(0,0,0,.18)'))).toHaveLength(1);
+    drawModel(ctx, P, [[0, 0, 0, 0.3, 0.3, 0.3, '#808080']], 0, 0, 0, 's', 1, '#000000'); // Umriss bleibt scharf
+    expect(a.faces).toHaveLength(2);
+    paintWith(ctx, null);
+    expect(painterOf(ctx)).toBeUndefined();
+    box(ctx, P, 0, 0, 0, 0.5, 0.5, 0.5, '#808080');
+    expect(a.faces).toHaveLength(2);
   });
 });
 

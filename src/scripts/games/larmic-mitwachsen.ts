@@ -1072,7 +1072,7 @@ class LarmicMitwachsen extends HTMLElement {
       // 3D-Welt, darüber die durchsichtige 2D-Ebene mit Zeichen, Pfeil, Nacht und Leiste
       this.r3d.render(this.world, this.state, scene);
       this.ctx.clearRect(0, 0, w, h);
-      this.renderer.overlay(this.world, this.state, scene, this.r3d.project);
+      this.renderer.overlay(this.world, this.state, scene, this.r3d.project, this.r3d.halos(), this.r3d.haloView());
     } else this.renderer.draw(this.world, this.state, scene);
     if (t - this.lastMap > 100) this.drawMiniMap(player, dpr, t); // Karte etwa zehnmal pro Sekunde
   }

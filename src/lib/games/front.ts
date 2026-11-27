@@ -124,19 +124,35 @@ export type FaceRect = {
   readonly side: boolean;
 };
 
+/** Leuchten eines kompakten Teils: Mitte in der Welt (x rechts, y nach vorn, z Höhe), größte Kante in Feldern, Farbe */
+export type HaloAt = { readonly x: number; readonly y: number; readonly z: number; size: number; color: string };
+
 /**
  * Maler der feinen Dinge, hereingereicht von der Ansicht (die Muster liegen dort, `lib` kennt keinen Browser-Code):
  * `face` legt Muster und Verlauf über eine schon gefüllte Fläche, `halo` merkt sich das Leuchten eines kompakten
- * Teils (Mitte und Größe in Pixeln, Farbe), das die Ansicht später in einem eigenen Durchgang zeichnet.
+ * Teils (Mitte in der Welt, Größe, Farbe), das die Ansicht später in einem eigenen Durchgang zeichnet.
  */
 export interface FinePainter {
   face(ctx: CanvasRenderingContext2D, face: FaceRect, fine: Fine | undefined): void;
-  halo?(x: number, y: number, size: number, color: string): void;
+  halo?(at: HaloAt): void;
 }
 
+const PAINTERS = new WeakMap<CanvasRenderingContext2D, FinePainter>();
 /**
- * Quader von vorn: Oberseite und Vorderseite. Ohne `painter` flach wie immer; mit ihm fein (Muster und Verlauf je
- * Fläche, helle Oberkante, Leuchten kompakter Teile mit `halo`).
+ * Maler für alles, was ab jetzt auf `ctx` gezeichnet wird, ohne dass der Aufruf selbst einen mitgibt (`box` ohne
+ * `painter`); `null` nimmt ihn wieder weg. So malt die Ansicht die Dinge ihrer Welt fein, ohne jede Zeichnung zu kennen.
+ */
+export function paintWith(ctx: CanvasRenderingContext2D, painter: FinePainter | null) {
+  if (painter) PAINTERS.set(ctx, painter);
+  else PAINTERS.delete(ctx);
+}
+/** Der Maler, der gerade auf `ctx` malt (undefined: flach) */
+export const painterOf = (ctx: CanvasRenderingContext2D): FinePainter | undefined => PAINTERS.get(ctx);
+
+/**
+ * Quader von vorn: Oberseite und Vorderseite. Ohne Maler flach wie immer; mit ihm fein (Muster und Verlauf je Fläche,
+ * helle Oberkante, Leuchten kompakter Teile mit `halo`). `painter` undefined: der Maler des Kontexts (`paintWith`),
+ * null: flach (Gelände, Böden, Torhäuser bleiben Block).
  */
 export function box(
   ctx: CanvasRenderingContext2D,
@@ -150,14 +166,15 @@ export function box(
   color: string,
   top?: string | null,
   fine?: Fine,
-  painter?: FinePainter,
+  painter?: FinePainter | null,
 ) {
+  const pen = painter === undefined ? PAINTERS.get(ctx) : (painter ?? undefined);
   const [ax, ay] = P(x0, y0, z0 + h);
   const [bx, by] = P(x0 + w, y0 + d, z0 + h);
   const [, cy] = P(x0, y0 + d, z0);
   ctx.fillStyle = top ?? color;
   ctx.fillRect(ax, ay, bx - ax, by - ay);
-  if (!painter) {
+  if (!pen) {
     ctx.fillStyle = 'rgba(255,255,255,.05)';
     ctx.fillRect(ax, ay, bx - ax, by - ay);
     ctx.fillStyle = color;
@@ -166,25 +183,23 @@ export function box(
     ctx.fillRect(ax, by, bx - ax, cy - by);
     return;
   }
-  painter.face(ctx, { x: ax, y: ay, w: bx - ax, h: by - ay, lu: w, lv: d, side: false }, fine);
+  pen.face(ctx, { x: ax, y: ay, w: bx - ax, h: by - ay, lu: w, lv: d, side: false }, fine);
   ctx.fillStyle = color;
   ctx.fillRect(ax, by, bx - ax, cy - by);
-  painter.face(ctx, { x: ax, y: by, w: bx - ax, h: cy - by, lu: w, lv: h, side: true }, fine);
+  pen.face(ctx, { x: ax, y: by, w: bx - ax, h: cy - by, lu: w, lv: h, side: true }, fine);
   const scale = (P(1, 0, 0)[0] - P(0, 0, 0)[0]) / TILE_W;
   if (edgeVisible(w, d, h)) {
     ctx.strokeStyle = `rgba(255,255,255,${edgeAlpha(fine?.halo)})`;
     ctx.lineWidth = edgeWidth(scale);
     ctx.strokeRect(ax, ay, bx - ax, by - ay);
   }
-  if (fine?.halo && painter.halo && haloCompact(w, d, h)) {
-    const [mx, my] = P(x0 + w / 2, y0 + d / 2, z0 + h / 2);
-    painter.halo(mx, my, Math.max(w, d, h) * TILE_W * scale, color);
-  }
+  if (fine?.halo && pen.halo && haloCompact(w, d, h))
+    pen.halo({ x: x0 + w / 2, y: y0 + d / 2, z: z0 + h / 2, size: Math.max(w, d, h), color });
 }
 
 /**
  * Modell an (cx, cy) auf Höhe z zeichnen, gedreht in Richtung dir. `mono` färbt alles ein (Umriss, bleibt scharf:
- * ohne Muster und Verlauf). `painter` zeichnet die Teile fein.
+ * ohne Muster und Verlauf). `painter` zeichnet die Teile fein (undefined: der Maler des Kontexts, null: flach).
  */
 export function drawModel(
   ctx: CanvasRenderingContext2D,
@@ -196,7 +211,7 @@ export function drawModel(
   dir: Dir,
   scale = 1,
   mono?: string,
-  painter?: FinePainter,
+  painter?: FinePainter | null,
 ) {
   const [fx, fy] = DIRS[dir];
   const [rx, ry] = RIGHT[dir];
@@ -242,7 +257,7 @@ export function drawModel(
     });
   }
   boxes.sort((a, b) => a.k - b.k);
-  const pen = mono ? undefined : painter;
+  const pen = mono ? null : painter;
   for (const b of boxes) box(ctx, P, b.x, b.y, b.z, b.w, b.d, b.h, b.c, b.t, b.fine, pen);
 }
 
