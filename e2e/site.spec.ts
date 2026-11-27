@@ -47,7 +47,8 @@ test('Unbekannte Adresse zeigt die 404-Seite, ohne Fehler, mit Weg zurück zum S
     'https://larmic.de/impressum/',
   );
   await expect(footer.getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('href', `${HOME}datenschutz/`);
-  expect(errors).toEqual([]);
+  // Genau eine Meldung: die Seite selbst kommt mit Status 404. Fehlt dazu eine eingebundene Datei, kommt eine zweite
+  expect(errors).toEqual(['console: Failed to load resource: the server responded with a status of 404 (Not Found)']);
 });
 
 test.describe('ruhende Seiten', () => {
