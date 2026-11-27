@@ -241,6 +241,7 @@ describe('Bahnsteig an Funkels Halt (Issue 39)', () => {
       expect([c.stop, c.solid, !!c.ride]).toEqual(['grube', false, false]); // begehbar wie zuvor
       expect(b.z).toBe(c.h);
       expect(b.parts).toBe(PLANK);
+      expect(b.foot).toBe(0); // liegt flach: kein Fleck am Boden
     }
     expect(new Set(planks.map((b) => `${b.x},${b.y}`)).size).toBe(planks.length);
     // das Schild steht auf dem Feld des Bahnsteigs, das am weitesten vom Sitz liegt

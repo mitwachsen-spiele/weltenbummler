@@ -5,12 +5,14 @@
 // an anderen Spielen). Fahren: Die Figur sitzt im ersten Wagen hinter der Lok (dort ist das Dach offen, Kopf und
 // Schultern schauen heraus); seine Tür hat bis zur ersten Fahrt einen goldenen Rahmen (nur dort kann das Kind etwas tun:
 // einsteigen). Sonst kein Gold. Dazu die Farben seines eigenen, schmalen Gleises (mitwachsen-funkel-look.ts).
+// Fein (Entwurf „Feine Grafik“, Issue 13): Kasten und Dach aus Lack, Räder, Rahmen und Schornstein aus Metall mit
+// Radnaben und Nieten, die Planken des Bahnsteigs aus Holz; Lampe, Lichter und Kristall der Tafel leuchten (`halo`).
 // Spec: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“)
 
-import type { Part } from '../../../../lib/games/front';
+import type { Fine, Part } from '../../../../lib/games/front';
 import { DIGITS, HALT_NUMBER, numberBadge } from '../../mitwachsen-digits';
 import { LOOK, figureParts } from '../../mitwachsen';
-import { FIGURE_LEGS } from '../../mitwachsen-fine';
+import { FIGURE_LEGS, dress, fine, type Dress } from '../../mitwachsen-fine';
 import { GOLD } from '../../mitwachsen-portals';
 
 /** Farben von Funkel (Konzeptseite: Petrol #2f8f83, Dach Creme #f3ead2), je Seite und Oberseite, wo es zwei gibt */
@@ -24,7 +26,12 @@ export const FUNKEL_COLORS = {
   lit: '#fffbe6', // Lampe an
   glow: '#fff3b0', // Schein vor der Lampe
   rim: '#d9cfb4', // Rand der Lampe
+  hub: '#c9ced8', // Radnabe
+  rivet: '#d9dce6', // Niete
 } as const;
+
+const HALO: Fine = { halo: true };
+const LACK: Fine = { skin: 'lack' };
 
 /** Farben des schmalen Gleises: Schwellen aus Schiefer, dunkle Schienen (anders als das Gleis der Höhlenbahn) */
 export const GRUBE_RAIL = {
@@ -44,7 +51,7 @@ export const HALT_COLORS = {
 } as const;
 /** Eine Planke des Bahnsteigs: flach auf dem Boden ihres Felds (Mitte in der Mitte), zwei Fugen quer */
 export const PLANK: readonly Part[] = [
-  [-0.5, -0.5, 0, 1, 1, 0.06, ...HALT_COLORS.plank],
+  fine([-0.5, -0.5, 0, 1, 1, 0.06, ...HALT_COLORS.plank], { skin: 'holz' }),
   [-0.5, -0.18, 0.06, 1, 0.03, 0.006, HALT_COLORS.seam],
   [-0.5, 0.15, 0.06, 1, 0.03, 0.006, HALT_COLORS.seam],
 ];
@@ -55,8 +62,10 @@ export const PLANK: readonly Part[] = [
 export const SIGN_FACE = { f: 0.06, z: 1.02, wide: 0.64, high: 0.5 } as const;
 export const HALT_SIGN: readonly Part[] = [
   [-0.05, -0.05, 0, 0.1, 0.1, 1.05, ...HALT_COLORS.post],
-  [0, -SIGN_FACE.wide / 2, SIGN_FACE.z, SIGN_FACE.f, SIGN_FACE.wide, SIGN_FACE.high, ...HALT_COLORS.board],
-  [SIGN_FACE.f, -0.2, SIGN_FACE.z + 0.2, 0.015, 0.2, 0.1, FENCE_CRYSTAL, FENCE_CRYSTAL], // Kristall: Raute aus drei Lagen
+  fine([0, -SIGN_FACE.wide / 2, SIGN_FACE.z, SIGN_FACE.f, SIGN_FACE.wide, SIGN_FACE.high, ...HALT_COLORS.board], {
+    skin: 'lack',
+  }),
+  fine([SIGN_FACE.f, -0.2, SIGN_FACE.z + 0.2, 0.015, 0.2, 0.1, FENCE_CRYSTAL, FENCE_CRYSTAL], HALO), // Kristall: Raute aus drei Lagen, die Mitte leuchtet
   [SIGN_FACE.f, -0.16, SIGN_FACE.z + 0.1, 0.015, 0.12, 0.1, FENCE_CRYSTAL, FENCE_CRYSTAL],
   [SIGN_FACE.f, -0.16, SIGN_FACE.z + 0.3, 0.015, 0.12, 0.1, FENCE_CRYSTAL, FENCE_CRYSTAL],
   ...numberBadge(HALT_NUMBER.funkel, SIGN_FACE.f, 0.17, SIGN_FACE.z + SIGN_FACE.high - 0.03, 0.045), // Halt 3 (Issue 40)
@@ -101,12 +110,22 @@ const both = ([f, r, ...rest]: Part): Part[] => [
   [f, -r - rest[2], ...rest],
 ];
 
+/** Räder jedes Wagens, außen je eine helle Nabe */
+const WHEELS: readonly Part[] = [-0.32, 0.12].flatMap((f) => [
+  ...both([f, -HW + 0.02, 0.02, 0.2, 0.08, 0.16, FUNKEL_COLORS.wheel]),
+  ...both([f + 0.06, -HW + 0.014, 0.06, 0.08, 0.006, 0.08, FUNKEL_COLORS.hub]),
+]);
 /** Räder und Rahmen jedes Wagens */
-const UNDER: readonly Part[] = [
-  ...both([-0.32, -HW + 0.02, 0.02, 0.2, 0.08, 0.16, FUNKEL_COLORS.wheel]),
-  ...both([0.12, -HW + 0.02, 0.02, 0.2, 0.08, 0.16, FUNKEL_COLORS.wheel]),
-  [-L / 2, -HW + 0.04, 0.12, L, 2 * HW - 0.08, 0.06, FUNKEL_COLORS.frame],
-];
+const UNDER: readonly Part[] = [...WHEELS, [-L / 2, -HW + 0.04, 0.12, L, 2 * HW - 0.08, 0.06, FUNKEL_COLORS.frame]];
+/** Nieten in einer Reihe auf beiden Seiten eines Kastens (`at`: vorn jeder Niete, `z`: Unterkante), knapp vor der Wand */
+const rivets = (at: readonly number[], z: number): Part[] =>
+  at.flatMap((f) => both([f, -HW - 0.008, z, 0.035, 0.008, 0.035, FUNKEL_COLORS.rivet]));
+/** Lack auf Kasten und Dach, Metall auf Rädern, Rahmen und Schornstein */
+const FUNKEL_DRESS: Dress = {
+  ...Object.fromEntries([...FUNKEL_COLORS.petrol, ...FUNKEL_COLORS.cream].map((c) => [c, LACK])),
+  [FUNKEL_COLORS.wheel]: { skin: 'metall' },
+  [FUNKEL_COLORS.frame]: { skin: 'metall' },
+};
 
 /** Die große runde Lampe vorn (gestuft rund aus drei Quadern, mit Rand); `lit`: an, mit kleinem Schein davor */
 const lamp = (lit: boolean): Part[] => {
@@ -115,7 +134,7 @@ const lamp = (lit: boolean): Part[] => {
     [L / 2, -0.15, 0.24, 0.025, 0.3, 0.3, FUNKEL_COLORS.rim],
     [L / 2 + 0.02, -0.11, 0.26, 0.025, 0.22, 0.26, face],
     [L / 2 + 0.02, -0.14, 0.29, 0.025, 0.28, 0.2, face],
-    ...(lit ? ([[L / 2 + 0.045, -0.09, 0.3, 0.03, 0.18, 0.18, FUNKEL_COLORS.glow]] as Part[]) : []),
+    ...(lit ? [fine([L / 2 + 0.045, -0.09, 0.3, 0.03, 0.18, 0.18, FUNKEL_COLORS.glow], HALO)] : []), // der Schein leuchtet
   ];
 };
 
@@ -128,6 +147,7 @@ const LOCO: readonly Part[] = [
   [-L / 2 - 0.03, -HW - 0.03, 0.8, 0.46, 2 * HW + 0.06, 0.06, ...C], // Dach
   [0.12, -0.07, 0.54, 0.14, 0.14, 0.14, FUNKEL_COLORS.frame], // Schornstein
   [0.1, -0.09, 0.68, 0.18, 0.18, 0.04, ...C],
+  ...rivets([-0.36, -0.2, -0.04, 0.12, 0.28], 0.42),
 ];
 
 /** Die Figur sitzt im ersten Wagen: ohne Beine, Kopf und Schultern schauen oben heraus */
@@ -141,6 +161,7 @@ const BENCH: readonly Part[] = [
   [-L / 2, -HW, 0.18, L, 2 * HW, 0.28, ...P],
   [-L / 2, -HW, 0.46, L, 2 * HW, 0.24, FUNKEL_COLORS.window, FUNKEL_COLORS.window],
   ...[-L / 2, -0.03, L / 2 - 0.06].map((f): Part => [f, -HW - 0.006, 0.46, 0.06, 2 * HW + 0.012, 0.24, ...P]),
+  ...rivets([-0.38, -0.3, 0.23, 0.31], 0.36), // neben der Tür und ihrem Rahmen
 ];
 /** Cremedach, ganz oder (`open`) in der Mitte offen: Dort schaut die Figur heraus */
 const roof = (open: boolean): Part[] =>
@@ -161,7 +182,7 @@ const CUTS = [-L / 2, -0.2, 0, 0.2, L / 2] as const;
 const sliced = (r: number, z: number, wide: number, h: number, side: string, top?: string): Part[] =>
   CUTS.slice(1).map((to, i): Part => [CUTS[i]!, r, z, to - CUTS[i]!, wide, h, side, top ?? side]);
 const REAR: readonly Part[] = [
-  ...UNDER.slice(0, 4), // Räder
+  ...WHEELS,
   ...sliced(-HW + 0.04, 0.12, 2 * HW - 0.08, 0.06, FUNKEL_COLORS.frame),
   ...sliced(-HW, 0.18, 2 * HW, 0.28, ...P),
   ...sliced(-HW, 0.46, 2 * HW, 0.24, FUNKEL_COLORS.window),
@@ -169,6 +190,7 @@ const REAR: readonly Part[] = [
   ...sliced(-HW - 0.03, 0.7, 2 * HW + 0.06, 0.06, ...C),
   [-L / 2 - 0.02, -HW - 0.03, 0.7, 0.02, 2 * HW + 0.06, 0.06, ...C],
   [L / 2, -HW - 0.03, 0.7, 0.02, 2 * HW + 0.06, 0.06, ...C],
+  ...rivets([-0.38, -0.3, 0.23, 0.31], 0.36),
 ];
 /**
  * Vier Kristall-Lichter in einer Reihe auf dem Dach des zweiten Wagens (dort verdeckt sie der Kopf der Figur nicht, und
@@ -179,7 +201,8 @@ const lights = (n: number): Part[] =>
   [3, 2, 1, 0].map((cut, i): Part => {
     const mid = (CUTS[cut]! + CUTS[cut + 1]!) / 2;
     const color = i < n ? FENCE_CRYSTAL : FUNKEL_COLORS.window; // Lila wie die Kristalle am Gang: hebt sich vom Cremedach ab
-    return [mid - 0.07, -0.08, 0.76, 0.14, 0.16, i < n ? 0.07 : 0.03, color, color];
+    const p: Part = [mid - 0.07, -0.08, 0.76, 0.14, 0.16, i < n ? 0.07 : 0.03, color, color];
+    return i < n ? fine(p, HALO) : p; // nur die leuchtenden leuchten weich in den Raum
   });
 
 /** Offene Tür zur Seite des Bahnsteigs (`side` +1 rechts, −1 links) */
@@ -208,14 +231,19 @@ export type FunkelLook = {
   lights?: number;
 };
 
+const FINE_LOCO = dress(LOCO, FUNKEL_DRESS);
+const FINE_REAR = dress(REAR, FUNKEL_DRESS);
+const FINE_BENCH = dress(BENCH, FUNKEL_DRESS);
+const ROOF = [dress(roof(false), FUNKEL_DRESS), dress(roof(true), FUNKEL_DRESS)] as const;
+
 export const funkelParts = (k: FunkelLook): Part[] =>
   k.kind === 'loco'
-    ? [...LOCO, ...lamp(!!k.lit)]
+    ? [...FINE_LOCO, ...lamp(!!k.lit)]
     : k.kind === 'rear'
-      ? [...REAR, ...lights(k.lights ?? 0)]
+      ? [...FINE_REAR, ...lights(k.lights ?? 0)]
       : [
-          ...BENCH,
-          ...roof(!!k.rider),
+          ...FINE_BENCH,
+          ...ROOF[+!!k.rider]!,
           ...(k.rider ? FIGURE : []),
           ...(k.door ? [door(k.door)] : []),
           ...(k.frame ? frame(k.frame) : []),

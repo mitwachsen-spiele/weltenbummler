@@ -5,6 +5,8 @@
 // Kristallkrümel. Hinter ihm bleibt liegen, was er baut (Issue 14, damit das Kind sieht, dass hier eine Bahn entsteht):
 // auf der offenen Strecke ein Bett frischer Erde, auf das die Ansicht das schmale Gleis legt (`BED_PART`), auf dem Fels
 // des Gangs Glitzerkrümel (`CRUMB_PARTS`). Kein Gold (die Welle ist keine Aktion), kein Gesicht, nichts Spitzes.
+// Fein (Entwurf „Feine Grafik“, Issue 13): Die zwei Kristallkrümel im Erdhügel leuchten weich (`halo`); das gelegte
+// Gleis hat dieselben Muster wie das echte (Schwellen Holz, Schienen Metall).
 // Spec: docs/specs/mitwachsen.md („Die Grubenbahn Funkel“, Der Maulwurf gräbt)
 
 import type { Part } from '../../../../lib/games/front';
@@ -53,8 +55,8 @@ export const MOUND_PARTS: readonly Part[] = [
   [0.2, -0.38, 0.12, 0.12, 0.12, 0.06, C[0], C[1]],
   [-0.4, 0.22, 0.12, 0.12, 0.1, 0.06, C[0], C[1]],
   [0.24, 0.24, 0.12, 0.1, 0.1, 0.05, C[0], C[1]],
-  [-0.06, 0.08, 0.3, 0.08, 0.08, 0.1, K[0], K[1]],
-  [0.06, -0.12, 0.26, 0.07, 0.07, 0.08, K[0], K[1]],
+  [-0.06, 0.08, 0.3, 0.08, 0.08, 0.1, K[0], K[1], undefined, { halo: true }],
+  [0.06, -0.12, 0.26, 0.07, 0.07, 0.08, K[0], K[1], undefined, { halo: true }],
 ];
 
 /** So hoch (Felder) liegt das Bett frischer Erde, auf dem das wachsende Gleis liegt */

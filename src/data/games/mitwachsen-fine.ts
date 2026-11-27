@@ -11,11 +11,14 @@ import type { Skin } from '../../lib/games/skins';
 /** Feinheit je Farbe (Farbe der Seite eines Teils) */
 export type Dress = Readonly<Record<string, Fine>>;
 
+/** Dasselbe Teil mit Muster bzw. Leuchten `how`; Feld 8 (Fläche mit Gesicht: 'f' | 'r' | 'l') bleibt erhalten */
+export const fine = (p: Part, how: Fine): Part => [p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7] ?? null, p[8], how];
+
 /** Allen Teilen dieser Farben je Farbe ihr Muster bzw. Leuchten geben; Gesichtsteile (Augen) und Teile mit eigener Feinheit bleiben */
 export const dress = (parts: readonly Part[], by: Dress): Part[] =>
   parts.map((p) => {
-    const fine = by[p[6]];
-    return fine && !p[8] && !p[9] ? [p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7] ?? null, undefined, fine] : p;
+    const how = by[p[6]];
+    return how && !p[8] && !p[9] ? fine(p, how) : p;
   });
 
 /** Dieselbe Feinheit für mehrere Farben */

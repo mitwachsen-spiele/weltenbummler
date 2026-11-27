@@ -63,7 +63,7 @@ import { riseOf, type HaloView } from './mitwachsen-halo';
 import { StoneNotes, stoneInto } from './mitwachsen-story-3d';
 import type { LoadedPack } from './mitwachsen-packs';
 import type { Scene } from './mitwachsen-render';
-import { SHEER } from './mitwachsen-ride-view';
+import { footOf, SHEER } from './mitwachsen-ride-view';
 import type { State } from './mitwachsen-state';
 import type { Cell, World } from './mitwachsen-world';
 import { homeAt, openRoof } from './mitwachsen-home';
@@ -777,7 +777,7 @@ export class World3D {
     const contacts: Contact[] = []; // weicher Fleck unter jedem Körper (mitwachsen-fine-bodies-3d.ts)
     this.bodyHalos = [];
     type At = { x: number; y: number; z: number; hop?: number; puff?: number };
-    // `foot`: Halbbreite des Flecks; `ground`: Boden unter einem hängenden Tier (sonst der Boden des Körpers)
+    // `foot`: Halbbreite des Flecks (0: keiner); `ground`: Boden unter einem hängenden Tier (sonst der Boden des Körpers)
     const place = (
       id: string,
       model: Model,
@@ -802,7 +802,8 @@ export class World3D {
       m.position.set(b.x + 0.5, b.z + (b.hop ?? 0), b.y + 0.5);
       m.rotation.y = id === 'player' && sc.pose !== 'stand' ? facing : YAW[dir];
       const at = { x: b.x + 0.5, y: b.y + 0.5, z: b.z + (b.hop ?? 0) };
-      contacts.push({ ...at, z: ground ?? b.z, hop: ground === undefined ? (b.hop ?? 0) : 0, foot: foot * size });
+      if (foot > 0)
+        contacts.push({ ...at, z: ground ?? b.z, hop: ground === undefined ? (b.hop ?? 0) : 0, foot: foot * size });
       if (model.halos.length) this.bodyHalos.push(...placeHalos(model.halos, at, m.rotation.y, size, id));
     };
     if (!state.sleeping && !state.ride) {
@@ -834,7 +835,7 @@ export class World3D {
     }
     for (const r of sc.rides)
       if (this.explored(Math.round(r.x), Math.round(r.y))) {
-        place(r.id, this.model(r.key, r.parts), 1, r.dir, r, 0.3);
+        place(r.id, this.model(r.key, r.parts), 1, r.dir, r, footOf(r));
         this.bodies.get(r.id)!.material = r.sheer ? this.sheer : this.entity;
       }
     this.contacts.update(contacts, sc.reduced);

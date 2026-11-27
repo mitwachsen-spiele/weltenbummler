@@ -8,7 +8,7 @@ import { GOLD } from '../../../../data/games/mitwachsen-portals';
 import { GANG_COLORS, LIFT } from '../../../../data/games/worlds/grube/mitwachsen-gang-model';
 import { TUNNEL_LIGHT } from '../../mitwachsen-dusk';
 import type { PackEvent } from '../../mitwachsen-pack-types';
-import type { RideAt } from '../../mitwachsen-ride-view';
+import { RIDE_FOOT, footOf, type RideAt } from '../../mitwachsen-ride-view';
 import { initialState, step, type Cmd, type GameEvent, type State } from '../../mitwachsen-state';
 import type { Scored } from '../../sfx';
 import { DUG, FAHRT_PACK, GRUBE_PACK, HOEHLE_PACK, worldOf } from '../../test-worlds';
@@ -205,6 +205,15 @@ describe('Körper am Glitzergang', () => {
     expect(all.some((b) => b.id.startsWith('ride:') || b.seat)).toBe(false);
     expect(all.some((b) => gold(b.parts))).toBe(false);
     expect(all.some((b) => b.parts.some((p) => p[8] === 'f'))).toBe(false); // keine Augen, kein Gesicht
+    // ohne Fleck am Boden: Tor (Pfosten am Rand, in der Mitte das Gleis), Scheibe (im Sturz), Wasserfall; Kristalle mit
+    expect(all.filter((b) => footOf(b) === 0).map((b) => b.id)).toEqual([
+      'grube-tor:in',
+      'grube-tor:in:scheibe',
+      'grube-tor:out',
+      'grube-tor:out:scheibe',
+      'grube-fall',
+    ]);
+    expect(all.filter((b) => b.id.startsWith('grube-kristall:')).every((b) => footOf(b) === RIDE_FOOT)).toBe(true);
     const [bx, by] = world.homes.lichtung.bed;
     expect(ids(inCave({ player: { x: bx, y: by, dir: 's' } }))).toEqual([]);
     expect(gangBodies({ ...inCave(), packs: {} }, world, AT, new GangFx())).toEqual([]);

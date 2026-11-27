@@ -78,7 +78,7 @@ import { moodLife } from './mitwachsen-sky';
 import { turnHead } from './mitwachsen-air';
 import { Album } from './mitwachsen-album';
 import { ASK, BIRD, BIRD_EYE, HEART, NOTE, ZZZ, sprite, type Particle } from './mitwachsen-glyphs';
-import { byRow, drawRide, type RideBody } from './mitwachsen-ride-view';
+import { byRow, drawRide, footOf, type RideBody } from './mitwachsen-ride-view';
 import { hangAt, labelHeight } from './mitwachsen-roost';
 import { isRing } from './mitwachsen-rim';
 import { PAL_RING, rimBlossoms } from './mitwachsen-rim-look';
@@ -308,7 +308,7 @@ export class Renderer {
   /** Ein Körper eines Fahrzeugs (im Nebel verborgen wie die Tiere) */
   private ride(P: Projection, sc: Scene, r: RideBody) {
     if (!sc.explored(Math.round(r.x), Math.round(r.y))) return;
-    contactShadow(this.ctx, P, r.x + 0.5, r.y + 0.5, r.z, 0.3, 0, sc.reduced);
+    if (footOf(r) > 0) contactShadow(this.ctx, P, r.x + 0.5, r.y + 0.5, r.z, footOf(r), 0, sc.reduced);
     drawRide(this.ctx, P, r);
   }
 

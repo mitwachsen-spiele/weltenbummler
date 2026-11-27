@@ -269,6 +269,7 @@ describe('Der Maulwurf gräbt den Glitzergang', () => {
     const all = laid((to + DIG.pop) / 2); // nach der Welle, vor `pop`: Alles liegt, der Hügel ist weg
     expect(digBodies(at((to + DIG.pop) / 2), world, AT).some((b) => b.id === MOUND_ID)).toBe(false);
     const rails = all.filter((b) => b.key !== `${LAID_ID}:kruemel`);
+    expect(all.every((b) => b.foot === 0)).toBe(true); // Gleis und Krümel liegen flach: kein Fleck am Boden
     expect(rails.length).toBeGreaterThan(8);
     for (const b of rails) {
       const [x, y] = lane[indexOf(b)]!;

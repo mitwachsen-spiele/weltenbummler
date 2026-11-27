@@ -6,7 +6,7 @@ import { haloCompact } from '../../lib/games/shade';
 import { SKINS } from '../../lib/games/skins';
 import { BASKET_PARTS, BOOK_PARTS, BUCKET_PARTS, LOOK, REGIONS, SPECIES, figureParts } from './mitwachsen';
 import { FISH_PARTS } from './mitwachsen-eis';
-import { ANIMAL_FINE, CARRY_DRESS, FIGURE_LEGS, darker, dress, fineFigure, fineSpecies } from './mitwachsen-fine';
+import { ANIMAL_FINE, CARRY_DRESS, FIGURE_LEGS, darker, dress, fine, fineFigure, fineSpecies } from './mitwachsen-fine';
 import { JUG_PARTS, LANTERN_PARTS, SHROOM_BASKET_PARTS, SHROOM_COLORS } from './mitwachsen-hoehle';
 
 const LICHTUNG = REGIONS[0].animals.map((a) => a.species);
@@ -48,6 +48,12 @@ describe('Feine Teile: Muster über die Farbe', () => {
     expect(out[1]).toBe(own);
     expect(out[2]).toEqual([0, 0, 0, 0.1, 0.1, 0.1, '#111111', '#222222', undefined, { skin: 'fell' }]);
     expect(out[3]).toBe(other);
+  });
+
+  it('fine behält die Fläche mit Gesicht (Feld 8) und setzt nur die Feinheit', () => {
+    const face: Part = [0, 0, 0, 0.1, 0.1, 0.1, '#111111', '#222222', 'f'];
+    expect(fine(face, { halo: true })).toEqual([0, 0, 0, 0.1, 0.1, 0.1, '#111111', '#222222', 'f', { halo: true }]);
+    expect(fine([0, 0, 0, 0.1, 0.1, 0.1, '#111111'], { skin: 'lack' })[7]).toBeNull();
   });
 
   it('darker macht jeden Kanal etwas dunkler', () => {

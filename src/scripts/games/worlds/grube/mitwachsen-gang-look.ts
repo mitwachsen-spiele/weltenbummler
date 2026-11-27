@@ -163,6 +163,7 @@ export function gangBodies(state: State, world: World, at: RideAt, fx: GangFx): 
       z,
       dir,
       parts: model(k, () => gateParts(shine)),
+      foot: 0, // Pfosten am Rand, in der Mitte fährt der Zug: kein Fleck auf dem Gleis
       ...glow(shine),
     });
     // die Scheibe wackelt nach dem Anstoßen hin und her, weich abklingend (nicht bei reduzierter Bewegung)
@@ -178,6 +179,7 @@ export function gangBodies(state: State, world: World, at: RideAt, fx: GangFx): 
       z: z + DISC_Z + (lifted ? LIFT : 0),
       dir: 's',
       parts: DISC_PARTS,
+      foot: 0, // hängt im Sturz
     });
   }
   const lit = riding ? litCrystals(g, p, at.reduced) : new Set<number>();
@@ -208,6 +210,7 @@ export function gangBodies(state: State, world: World, at: RideAt, fx: GangFx): 
       z: world.cell(x, y).h,
       dir: 's',
       parts: model(k, () => fallParts(phase)),
+      foot: 0, // Wasser
     });
   }
   return out;
