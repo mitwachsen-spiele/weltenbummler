@@ -9,6 +9,7 @@
 import type { Point } from '../../../../data/games/mitwachsen';
 import type { Cell } from '../../mitwachsen-cell';
 import type { Box } from '../../mitwachsen-view';
+import type { Fine } from '../../../../lib/games/front';
 
 /** Tiefeis der innersten Reihe: Seite, Oberseite, helle Spitze der Zacken */
 export const DEEP_ICE = { side: '#2c5884', top: '#3a74a6', tip: '#8fc4e8' } as const;
@@ -32,16 +33,19 @@ export function markIceRim(cells: readonly Point[], map: Map<string, Cell>): Poi
   return out;
 }
 
+/** Feinheit der Zacken: Eisblock mit Fugen */
+const BLOCK: Fine = { skin: 'eisblock' };
+
 /**
  * Zackenkamm auf einem Feld des Tiefeises: drei spitze Zacken verschiedener Höhe, fest aus der Lage, jede mit heller
- * Spitze. Für 2D und 3D dieselben Quader
+ * Spitze. Für 2D und 3D dieselben Quader; fein: die Zacken aus Eisblock
  */
 export function crestBoxes(c: Cell, x: number, y: number): Box[] {
   if (!c.rim) return [];
   const n = (((x * 73856093) ^ (y * 19349663)) >>> 0) % 4;
   const { side, top, tip } = DEEP_ICE;
   const spike = (dx: number, dy: number, w: number, h: number): Box[] => [
-    [x + dx, y + dy, c.h, w, w, h, side, top],
+    [x + dx, y + dy, c.h, w, w, h, side, top, undefined, BLOCK],
     [x + dx + w * 0.25, y + dy + w * 0.25, c.h + h, w * 0.5, w * 0.5, h * 0.45, top, tip],
   ];
   return [

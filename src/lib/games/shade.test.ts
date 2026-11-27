@@ -5,6 +5,8 @@ import {
   EDGE_AO,
   HALO_HYST,
   HALO_LIMIT,
+  MARK_FRINGE,
+  MARK_RAMP,
   contactAlpha,
   contactFall,
   contactRadius,
@@ -13,10 +15,14 @@ import {
   edgeVisible,
   edgeWidth,
   faceShade,
+  fringeAlpha,
   groundEdges,
   haloCompact,
   haloPick,
   haloRadius,
+  markMask,
+  softAxis,
+  softMark,
   vertexShade,
   type HaloCand,
 } from './shade';
@@ -220,5 +226,56 @@ describe('Weicher Schatten am Boden neben Höherem', () => {
     expect(bad).toEqual([]);
     expect(cornerShade(h, 1, 2).x1y0).toBeLessThan(1); // am Ende der Mauer liegt Schatten
     expect(cornerShade(h, 1, 1).x1y1).toBe(cornerShade(h, 1, 2).x1y0); // auch schräg davor
+  });
+});
+
+describe('Weiche Ränder flacher Marken', () => {
+  it('wächst nur auf Achsen kürzer als ein Feld, die alte Kante liegt mitten im Saum', () => {
+    expect([softAxis(0.12), softAxis(0.92), softAxis(1)]).toEqual([true, true, false]);
+    const s = softMark(2, 3.26, 1, 0.12); // Kufenspur längs: x hart, y weich
+    expect([s.x, s.w, s.u]).toEqual([2, 1, [0.5, 0.5]]);
+    expect(s.v).toEqual([0, 1]);
+    expect(s.y + s.d / 2).toBeCloseTo(3.32, 9); // Mitte bleibt
+    expect((3.26 - s.y) / s.d).toBeCloseTo(MARK_RAMP / 2, 9); // Kante mitten im Verlauf der Maske
+    const p = softMark(0.3, 0.3, 0.1, 0.2);
+    expect([p.u, p.v]).toEqual([
+      [0, 1],
+      [0, 1],
+    ]);
+    expect(p.w).toBeGreaterThan(0.1);
+  });
+
+  it('der Saum bleibt im eigenen Feld: Fleck am Halt (0,92 ab Feld + 0,04) wächst nur bis an den Feldrand', () => {
+    for (const x of [0, 5, -3]) {
+      const s = softMark(x + 0.04, x + 0.04, 0.92, 0.92);
+      expect(s.x).toBeGreaterThanOrEqual(x - 1e-9);
+      expect(s.x + s.w).toBeLessThanOrEqual(x + 1 + 1e-9);
+      expect(s.y).toBeGreaterThanOrEqual(x - 1e-9);
+      expect(s.y + s.d).toBeLessThanOrEqual(x + 1 + 1e-9);
+      expect(s.x + s.w / 2).toBeCloseTo(x + 0.5, 9); // Mitte bleibt
+    }
+    const edge = softMark(4, 4.5, 0.2, 0.2); // am Feldrand: wächst nicht
+    expect([edge.x, edge.w, edge.u]).toEqual([4, 0.2, [0, 1]]);
+  });
+
+  it('Maske: Mitte voll, Rand läuft aus, an der alten Kante halb; harte Achse (Mitte der Maske) voll', () => {
+    const n = 32;
+    const m = markMask(n);
+    const a = (x: number, y: number) => m[(y * n + x) * 4 + 3]!;
+    expect(m.length).toBe(n * n * 4);
+    expect(a(16, 16)).toBe(255);
+    expect(a(0, 16)).toBeLessThan(20);
+    expect(a(0, 0)).toBeLessThan(5);
+    expect(a(4, 16)).toBeGreaterThan(90); // nahe der alten Kante (1/8)
+    expect(a(4, 16)).toBeLessThan(165);
+    expect(m[0]).toBe(255); // weiß: die Farbe kommt je Ecke
+  });
+
+  it('2D in zwei Lagen: Saum blass, Mitte so deutlich wie die Marke', () => {
+    for (const alpha of [0.42, 0.2, 1]) {
+      const [outer, inner] = fringeAlpha(alpha);
+      expect(outer).toBeCloseTo(alpha * MARK_FRINGE, 9);
+      expect(1 - (1 - outer) * (1 - inner)).toBeCloseTo(alpha, 9);
+    }
   });
 });

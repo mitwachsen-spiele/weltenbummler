@@ -8,11 +8,11 @@
 
 import type { Part } from '../../../../lib/games/front';
 import { LOOK, figureParts } from '../../mitwachsen';
-import { FIGURE_LEGS } from '../../mitwachsen-fine';
+import { FIGURE_LEGS, dress, type Dress } from '../../mitwachsen-fine';
 import { GOLD } from '../../mitwachsen-portals';
 import { RIDES } from '../../mitwachsen-rides';
 import { ICE_COLORS } from './mitwachsen-ice-colors';
-import { ICE_MODELS } from './mitwachsen-ice-models';
+import { ICE_FINE_MODELS } from './mitwachsen-ice-fine';
 
 const SKY = [RIDES[0].color, '#a6d4f4'] as const; // Himmelblau, oben heller
 const SKY_DARK = '#5a94c4';
@@ -24,6 +24,24 @@ const LEATHER = '#6b4a36';
 const IRON = '#4a4f5a';
 const LAMP = ['#ffc94a', '#fff1b8'] as const; // brennt
 const GLASS = ['#c9d6e0', '#e8eef3'] as const; // aus
+const POST = '#8a6a4c'; // Holz des Pfahls
+
+/**
+ * Feinheit (Entwurf „Feine Grafik“): Schlitten in Lack, Kufen und Eisen aus Metall, Decke gesteppt, Geschirr und Riemen
+ * aus Leder (Lack), Pfahl aus Holz, Schnee glitzert; die Laterne leuchtet, wenn sie brennt (Gold bleibt ohne Muster)
+ */
+const SLED_DRESS: Dress = {
+  [SKY[0]]: { skin: 'lack' },
+  [SKY_DARK]: { skin: 'lack' },
+  [RUNNER[0]]: { skin: 'metall' },
+  [IRON]: { skin: 'metall' },
+  [BLANKET[0]]: { skin: 'quilt' },
+  [HARNESS[0]]: { skin: 'lack' },
+  [LEATHER]: { skin: 'lack' },
+  [LAMP[0]]: { halo: true },
+  [POST]: { skin: 'holz' },
+  [ICE_COLORS.snow[0]]: { skin: 'schnee' },
+};
 
 /** Teil auf beiden Seiten: wie angegeben und an der Mitte gespiegelt */
 const both = ([f, r, ...rest]: Part): Part[] => [
@@ -34,8 +52,10 @@ const both = ([f, r, ...rest]: Part): Part[] => [
 const shift = (parts: readonly Part[], df: number, dz: number): Part[] =>
   parts.map(([f, r, z, ...rest]) => [f + df, r, z + dz, ...rest]);
 
-/** Schlitten (Mitte auf dem Feld des Sitzes, vorn zum Zugtier) */
+/** Schlitten (Mitte auf dem Feld des Sitzes, vorn zum Zugtier); vorn auf dem Brett zwei Nieten */
 const SLED: readonly Part[] = [
+  [0.47, -0.2, 0.2, 0.006, 0.04, 0.04, IRON], // Nieten
+  [0.47, 0.16, 0.2, 0.006, 0.04, 0.04, IRON],
   ...both([-0.55, 0.24, 0, 1.08, 0.06, 0.04, ...RUNNER]), // Kufen, vorn hochgebogen
   ...both([0.5, 0.24, 0.04, 0.06, 0.06, 0.14, ...RUNNER]),
   ...both([0.4, 0.24, 0.16, 0.14, 0.06, 0.04, ...RUNNER]),
@@ -55,10 +75,10 @@ const GOLDEN: readonly Part[] = [
   ...both([-0.5, 0.22, 0.31, 0.95, 0.07, 0.03, ...FRAME]),
   [-0.57, -0.29, 0.46, 0.08, 0.58, 0.03, ...FRAME],
 ];
-/** Wimpel mit Schneeflocke nach der ersten Heimfahrt */
+/** Wimpel aus Stoff mit Schneeflocke nach der ersten Heimfahrt */
 const PENNANT: readonly Part[] = [
   [-0.6, 0.18, 0.46, 0.04, 0.04, 0.5, LEATHER], // Stange
-  [-0.56, 0.19, 0.74, 0.26, 0.015, 0.2, ...BLANKET], // Wimpel
+  [-0.56, 0.19, 0.74, 0.26, 0.015, 0.2, ...BLANKET, undefined, { skin: 'stoff' }], // Wimpel
   [-0.47, 0.205, 0.83, 0.1, 0.006, 0.025, ...SKY], // Schneeflocke
   [-0.43, 0.205, 0.79, 0.025, 0.006, 0.1, ...SKY],
   [-0.47, 0.179, 0.83, 0.1, 0.006, 0.025, ...SKY],
@@ -77,25 +97,33 @@ const RIDER: readonly Part[] = shift(figureParts(LOOK).slice(FIGURE_LEGS), -0.22
 export type SledLook = { frame: boolean; pennant: boolean; lamp: boolean; seated: boolean; open: boolean };
 /** Teile des Schlittens in seiner Variante */
 export const sledParts = (k: SledLook): Part[] => [
-  ...SLED,
-  ...(k.open ? SIDES_OPEN : SIDES),
-  ...(k.frame ? GOLDEN : []),
-  ...(k.pennant ? PENNANT : []),
-  ...(k.lamp ? LANTERN : []),
-  ...(k.seated ? RIDER : []),
+  ...dress(
+    [
+      ...SLED,
+      ...(k.open ? SIDES_OPEN : SIDES),
+      ...(k.frame ? GOLDEN : []),
+      ...(k.pennant ? PENNANT : []),
+      ...(k.lamp ? LANTERN : []),
+    ],
+    SLED_DRESS,
+  ),
+  ...(k.seated ? RIDER : []), // die Figur ist schon fein
 ];
 
 /** Das Schlittenrentier (Mitte auf dem Feld vor dem Sitz) mit Geschirr, Glöckchen und Zugriemen zum Schlitten */
 export const REINDEER: readonly Part[] = [
-  ...ICE_MODELS.rentier,
-  [0.14, -0.14, 0.4, 0.12, 0.28, 0.06, ...HARNESS], // Halsband
-  [-0.1, -0.145, 0.25, 0.06, 0.29, 0.26, ...HARNESS], // Bauchgurt
-  ...both([0.2, 0.12, 0.33, 0.06, 0.05, 0.06, ...FRAME]), // Glöckchen
-  [0.27, -0.03, 0.32, 0.05, 0.06, 0.06, ...FRAME],
-  ...both([-0.44, 0.13, 0.32, 0.36, 0.02, 0.025, LEATHER]), // Zugriemen zum Schlitten
+  ...ICE_FINE_MODELS.rentier,
+  ...dress(
+    [
+      [0.14, -0.14, 0.4, 0.12, 0.28, 0.06, ...HARNESS], // Halsband
+      [-0.1, -0.145, 0.25, 0.06, 0.29, 0.26, ...HARNESS], // Bauchgurt
+      ...both([0.2, 0.12, 0.33, 0.06, 0.05, 0.06, ...FRAME]), // Glöckchen
+      [0.27, -0.03, 0.32, 0.05, 0.06, 0.06, ...FRAME],
+      ...both([-0.44, 0.13, 0.32, 0.36, 0.02, 0.025, LEATHER]), // Zugriemen zum Schlitten
+    ],
+    SLED_DRESS,
+  ),
 ];
-
-const POST = '#8a6a4c'; // Holz des Pfahls
 /** Laternenpfahl am Halt im Kessel (Mitte auf seinem Feld, der Arm nach vorn zur Strecke), Schnee am Fuß und obenauf */
 const POST_PARTS: readonly Part[] = [
   [-0.2, -0.2, 0, 0.4, 0.4, 0.07, ...ICE_COLORS.snow],
@@ -105,8 +133,12 @@ const POST_PARTS: readonly Part[] = [
   [0.27, -0.015, 0.98, 0.03, 0.03, 0.06, IRON], // Haken der Laterne
 ];
 /** Laternenpfahl; seine Laterne brennt am Abend und in der Nacht (`lit`) */
-export const postParts = (lit: boolean): Part[] => [
-  ...POST_PARTS,
-  [0.21, -0.07, 0.78, 0.15, 0.14, 0.18, ...(lit ? LAMP : GLASS)],
-  [0.2, -0.08, 0.96, 0.17, 0.16, 0.03, IRON],
-];
+export const postParts = (lit: boolean): Part[] =>
+  dress(
+    [
+      ...POST_PARTS,
+      [0.21, -0.07, 0.78, 0.15, 0.14, 0.18, ...(lit ? LAMP : GLASS)],
+      [0.2, -0.08, 0.96, 0.17, 0.16, 0.03, IRON],
+    ],
+    SLED_DRESS,
+  );

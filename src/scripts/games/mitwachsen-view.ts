@@ -5,6 +5,7 @@
 // Spezifikation: docs/specs/mitwachsen.md (Abschnitt „Welt-Pakete“)
 
 import { box, type Fine, type FinePainter, type Projection } from '../../lib/games/front';
+import { MARK_FRINGE, softMark } from '../../lib/games/shade';
 import type { GateId, RegionId, SpeciesId } from '../../data/games/mitwachsen';
 import type { HeraldEvent } from './mitwachsen-herald';
 import type { Deco } from './mitwachsen-cell';
@@ -60,6 +61,23 @@ export function drawBox(
   painter?: FinePainter | null,
 ) {
   if (b) box(ctx, P, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[9], painter);
+}
+
+/**
+ * Flache Marke am Boden (Kufenspur, Schneefleck am Halt) mit weichem Rand (Entwurf „Feine Grafik“): zuerst der um den
+ * Saum gewachsene Quader halb durchsichtig (`softMark`, `MARK_FRINGE`), dann die Marke selbst, flach. Läuft sie über die
+ * ganze Länge eines Felds, bleibt diese Achse hart (sonst Lücken zwischen den Feldern)
+ */
+export function drawMark(ctx: CanvasRenderingContext2D, P: Projection, b: Box) {
+  const [x, y, z, w, d, h, side, top] = b;
+  const s = softMark(x, y, w, d);
+  if (s.w !== w || s.d !== d) {
+    const a = ctx.globalAlpha;
+    ctx.globalAlpha = a * MARK_FRINGE;
+    drawBox(ctx, P, [s.x, s.y, z, s.w, s.d, h, side, top], null);
+    ctx.globalAlpha = a;
+  }
+  drawBox(ctx, P, b, null);
 }
 
 /**

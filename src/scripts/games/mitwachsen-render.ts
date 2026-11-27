@@ -44,7 +44,16 @@ import {
 } from '../../data/games/mitwachsen';
 import { carried } from './mitwachsen-carry';
 import { grown } from './mitwachsen-growth';
-import { drawBox, drawDeco, placeRails, type Box, type DecoAt, type RailFoot, type View2D } from './mitwachsen-view';
+import {
+  drawBox,
+  drawDeco,
+  drawMark,
+  placeRails,
+  type Box,
+  type DecoAt,
+  type RailFoot,
+  type View2D,
+} from './mitwachsen-view';
 import { decoBoxes } from './mitwachsen-deco-look';
 import {
   SIGN_TOP,
@@ -236,7 +245,7 @@ export class Renderer {
     this.guest = this.guestAt(world, state);
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) this.ground(P, world, x, y, sc);
-      for (const b of marks.get(y) ?? []) if (sc.explored(Math.floor(b[0]), y)) drawBox(ctx, P, b, null);
+      for (const b of marks.get(y) ?? []) if (sc.explored(Math.floor(b[0]), y)) drawMark(ctx, P, b); // weicher Rand
       for (const v of this.views.values()) v.trail?.draw(ctx, world, P, y); // Fußspuren im Schnee (aus dem Welt-Paket)
       for (let x = x0; x <= x1; x++) this.deco(P, world, state, sc, x, y);
       for (const b of this.later)

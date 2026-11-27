@@ -225,7 +225,8 @@ export type Laid = {
  * Tok, der am Abend schlafend kam, wacht auf); die Spielseite fragt es beim Start und nach langer Pause.
  * `away`: Tiere, die nach dem Spielstand der Pakete gerade nicht in ihrer Welt wohnen (Bahn: der erste Maulwurf sitzt
  * bis Bau 2 auf Toks Helm); die Welt merkt sie sich (`World.away`), sie werden nicht verteilt. `solos`: Modell einer
- * Art ohne den, der auf ihr sitzt (Tok ohne den Maulwurf), für Tiere mit `solo`.
+ * Art ohne den, der auf ihr sitzt (Tok ohne den Maulwurf), für Tiere mit `solo`. `outlines`: Grundform einer Art ohne
+ * ihre Feinteile (`Species.outline`, Eis-Tiere): Daraus entsteht der Umriss von „Noch nicht“.
  */
 export type WorldPack<
   Rules = unknown,
@@ -267,4 +268,5 @@ export type WorldPack<
   models?: Partial<Record<SpeciesId, readonly Part[]>>;
   roosts?: Partial<Record<SpeciesId, readonly Part[]>>;
   solos?: Partial<Record<SpeciesId, readonly Part[]>>;
+  outlines?: Partial<Record<SpeciesId, readonly Part[]>>;
 };

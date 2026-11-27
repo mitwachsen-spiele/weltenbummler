@@ -160,3 +160,63 @@ export function cornerShade(
   };
   return { x0y0: corner(-1, -1), x1y0: corner(1, -1), x1y1: corner(1, 1), x0y1: corner(-1, 1) };
 }
+
+// ---------- Weiche Ränder flacher Marken (Spuren, Fleck am Halt) ----------
+
+/** Ab dieser Länge (Felder) läuft eine Marke ins Nachbarfeld weiter (Kufenspur): Diese Achse bleibt hart, sonst Lücken */
+export const MARK_FULL = 0.95;
+/** Anteil der weichen Fläche je Seite, über den die Maske ausläuft (die alte Kante liegt in der Mitte dieses Saums) */
+export const MARK_RAMP = 0.25;
+/** Deckkraft des äußeren Saums in 2D (Anteil der Deckkraft der Marke) */
+export const MARK_FRINGE = 0.4;
+
+/** Läuft die Marke auf dieser Achse weich aus? (nicht über die ganze Länge eines Felds) */
+export const softAxis = (len: number): boolean => len < MARK_FULL;
+
+/**
+ * Eine weiche Achse: von `at` aus `len` lang, gewachsen um den Saum; `t0`/`t1` Koordinate in der Maske (0 … 1). Der Saum
+ * bleibt im eigenen Feld (sonst malt er in 2D über Dinge der Reihe davor und hängt in 3D über tieferem Nachbarboden in
+ * der Luft): Liegt die Marke nah am Feldrand, wächst sie nur so weit, der Verlauf liegt dann weiter innen.
+ */
+function axis(at: number, len: number): readonly [number, number, number, number] {
+  if (!softAxis(len)) return [at, len, 0.5, 0.5]; // hart: mitten im vollen Teil der Maske
+  const field = Math.floor(at + 1e-9);
+  const room = Math.max(0, Math.min(at - field, field + 1 - (at + len)));
+  const grow = Math.min((len * MARK_RAMP) / (2 * (1 - MARK_RAMP)), room);
+  return [at - grow, len + 2 * grow, 0, 1];
+}
+
+/**
+ * Flache Marke [x, y, Breite, Tiefe] mit weichem Rand: um den Saum gewachsen (die alte Kante liegt mitten im Verlauf,
+ * so bleibt sie gleich groß) und die Koordinaten in der Maske (`markMask`) je Achse. Achsen über die Länge eines Felds
+ * bleiben hart (`softAxis`)
+ */
+export function softMark(x: number, y: number, w: number, d: number) {
+  const [sx, sw, u0, u1] = axis(x, w);
+  const [sy, sd, v0, v1] = axis(y, d);
+  return { x: sx, y: sy, w: sw, d: sd, u: [u0, u1] as const, v: [v0, v1] as const };
+}
+
+/** Verlauf am Rand der Maske: 0 an der Kante, 1 nach `MARK_RAMP`, weich (smoothstep) */
+function ramp(t: number): number {
+  const s = Math.max(0, Math.min(1, Math.min(t, 1 - t) / MARK_RAMP));
+  return s * s * (3 - 2 * s);
+}
+
+/** Maske einer weichen Marke (n × n, RGBA, weiß, Deckkraft im Alphakanal): Mitte voll, Rand läuft je Achse aus */
+export function markMask(n = 32): Uint8Array {
+  const data = new Uint8Array(n * n * 4);
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++)
+      data.set([255, 255, 255, Math.round(255 * ramp((x + 0.5) / n) * ramp((y + 0.5) / n))], (y * n + x) * 4);
+  return data;
+}
+
+/**
+ * 2D in zwei Lagen statt einer Maske: zuerst der gewachsene Saum, dann die Marke selbst. Deckkraft beider Lagen so,
+ * dass die Mitte genau `alpha` hat: [Saum, Marke]
+ */
+export function fringeAlpha(alpha: number): readonly [number, number] {
+  const outer = alpha * MARK_FRINGE;
+  return [outer, 1 - (1 - alpha) / (1 - outer)];
+}

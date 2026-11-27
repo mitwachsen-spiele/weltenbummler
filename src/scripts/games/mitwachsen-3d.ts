@@ -640,7 +640,7 @@ export class World3D {
     add(lava, this.lava, false);
     add(bright, this.bright, false);
     add(glow, this.glow, false);
-    return { meshes, halos: chunkHalos(`${cx},${cy}`, [fine.solid, fine.see, fine.tiny, bright]) };
+    return { meshes, halos: chunkHalos(`${cx},${cy}`, [fine.solid, fine.see, fine.tiny, bright, glow]) };
   }
 
   private terrain(g: Geo, water: Geo, lava: Geo, world: World, c: Cell, x: number, y: number, fine?: FineSinks) {
@@ -726,9 +726,10 @@ export class World3D {
   private packed(geo: { fine: FineSinks; blades: Geo; glow: Geo }, c: Cell, x: number, y: number): boolean {
     const boxes = drawDeco(this.views.decos, this.world!, c, x, y, this.at);
     for (const b of boxes ?? []) {
-      const [bx, by, bz, w, d, bh, side, top, kind] = b;
-      if (kind === 'sway' || kind === 'glow')
-        (kind === 'sway' ? geo.blades : geo.glow).box(bx, bz, by, w, bh, d, side, top);
+      const [bx, by, bz, w, d, bh, side, top, kind, how] = b;
+      if (kind === 'sway') geo.blades.box(bx, bz, by, w, bh, d, side, top);
+      else if (kind === 'glow')
+        geo.glow.box(bx, bz, by, w, bh, d, side, top, 'white', undefined, how); // Eiskristall: leuchtet, dazu `halo`
       else fineBox(sinkOf(geo.fine, b), b); // Dinge der Welt fein, Laub vor der Figur durchsichtig
     }
     return !!boxes;
