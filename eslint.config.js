@@ -54,7 +54,7 @@ export default defineConfig(
   },
   {
     files: ['src/scripts/games/mitwachsen-map.ts'],
-    rules: { 'max-lines-per-function': ['error', { max: 88, skipBlankLines: true, skipComments: true }] },
+    rules: { 'max-lines-per-function': ['error', { max: 92, skipBlankLines: true, skipComments: true }] }, // gemessen 87 (`drawMap`, Issue 17)
   },
   {
     files: ['src/scripts/games/mitwachsen-render.ts'],
@@ -69,7 +69,7 @@ export default defineConfig(
     files: ['src/scripts/games/mitwachsen-state.ts'],
     rules: {
       complexity: ['error', 24],
-      'max-lines': ['error', { max: 546, skipBlankLines: true, skipComments: true }], // gemessen 520
+      'max-lines': ['error', { max: 558, skipBlankLines: true, skipComments: true }], // gemessen 531 (Issue 17)
     },
   },
   {
@@ -77,7 +77,7 @@ export default defineConfig(
     rules: {
       complexity: ['error', 68],
       'max-lines': ['error', { max: 694, skipBlankLines: true, skipComments: true }], // gemessen 631
-      'max-lines-per-function': ['error', { max: 135, skipBlankLines: true, skipComments: true }], // gemessen 129 (`buildStart`)
+      'max-lines-per-function': ['error', { max: 142, skipBlankLines: true, skipComments: true }], // gemessen 135 (`buildStart`, Issue 17)
     },
   },
   {

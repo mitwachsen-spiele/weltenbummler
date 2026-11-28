@@ -68,9 +68,10 @@ export const RULES: Rule[] = [
       // 3D-Teil: kommt erst nach der 3D-Ansicht (Three.js, Baukasten der Zugänge) und dem Paket der Welt
       { chunks: /\/welt-eis-3d\.[\w-]+\.js$/, after: /\/(mitwachsen-3d|welt-eis)\.[\w-]+\.js$/ },
     ],
-    // Gemessen 85,6 KB (mit Fülle im Schnee, Issue 16, Rodelberg samt Rodelreifen, Issue 50, Spielorten, Issue 52, und
-    // der Schneeraupe mit ihrer Runde, Issue 54; vor diesen vier 63,4 KB): Grenze nach gemessen + 10 %
-    budget: 94.2 * 1024,
+    // Gemessen 91,7 KB nach der Feinen Grafik (Issue 13; vorher 85,6 KB mit Fülle im Schnee, Issue 16, Rodelberg samt
+    // Rodelreifen, Issue 50, Spielorten, Issue 52, und der Schneeraupe, Issue 54): unter 3 % Luft, darum Grenze nach
+    // gemessen + 10 % (Issue 17)
+    budget: 100.9 * 1024,
     forbidden: /WebGLRenderer|three\.module/,
   },
   {
